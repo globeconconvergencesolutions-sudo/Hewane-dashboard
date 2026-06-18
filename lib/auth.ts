@@ -11,40 +11,30 @@ export const authConfig: NextAuthConfig = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Invalid credentials");
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            return null;
+          }
+
+          // For MVP development: demo credentials for Hewane School
+          const adminEmail = "admin@hewaneschoolofmusic.com";
+          const adminPassword = "password123"; // Demo password - change in production
+
+          // Simple demo authentication - replace with database lookup in production
+          if (credentials.email === adminEmail && credentials.password === adminPassword) {
+            return {
+              id: "admin",
+              email: adminEmail,
+              name: "Hewane Administrator",
+              role: "admin",
+            };
+          }
+
+          return null;
+        } catch (error) {
+          console.error("[v0] Auth error:", error);
+          return null;
         }
-
-        // For MVP: simple hardcoded admin check
-        // In production, verify against a secure database or LDAP
-        const adminEmail = process.env.ADMIN_EMAIL;
-        const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
-
-        if (!adminEmail || !adminPasswordHash) {
-          console.error("[v0] Admin credentials not configured in env");
-          throw new Error("Server misconfigured");
-        }
-
-        if (credentials.email !== adminEmail) {
-          throw new Error("Invalid email or password");
-        }
-
-        // Compare password hash
-        const isValidPassword = await compare(
-          credentials.password as string,
-          adminPasswordHash
-        );
-
-        if (!isValidPassword) {
-          throw new Error("Invalid email or password");
-        }
-
-        return {
-          id: "admin",
-          email: adminEmail,
-          name: "Admin",
-          role: "admin",
-        };
       },
     }),
   ],
