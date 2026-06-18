@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth-server";
+import { auth } from "@/lib/auth";
 import { getSheetData } from "@/lib/sheets";
 import { Contact } from "@/lib/types";
 import { SHEET_TABS } from "@/lib/constants";

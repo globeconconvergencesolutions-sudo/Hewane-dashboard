@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth-server";
+import { auth } from "@/lib/auth";
 import { ValidationResult } from "@/lib/types";
 import logger, { errorLogger } from "@/lib/logger";
 

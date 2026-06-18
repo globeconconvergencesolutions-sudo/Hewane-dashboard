@@ -1,62 +1,40 @@
-import { NextAuthConfig } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
+import { betterAuth } from 'better-auth'
+import { pool } from '@/lib/db'
 
-export const authConfig: NextAuthConfig = {
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        try {
-          if (!credentials?.email || !credentials?.password) {
-            return null;
-          }
-
-          // For MVP development: demo credentials for Hewane School
-          const adminEmail = "admin@hewaneschoolofmusic.com";
-          const adminPassword = "password123"; // Demo password - change in production
-
-          // Simple demo authentication - replace with database lookup in production
-          if (credentials.email === adminEmail && credentials.password === adminPassword) {
-            return {
-              id: "admin",
-              email: adminEmail,
-              name: "Hewane Administrator",
-              role: "admin",
-            };
-          }
-
-          return null;
-        } catch (error) {
-          console.error("[v0] Auth error:", error);
-          return null;
-        }
-      },
-    }),
+export const auth = betterAuth({
+  database: pool,
+  baseURL:
+    process.env.BETTER_AUTH_URL ??
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.V0_RUNTIME_URL),
+  emailAndPassword: {
+    enabled: true,
+    autoSignIn: true,
+  },
+  trustedOrigins: [
+    ...(process.env.V0_RUNTIME_URL ? [process.env.V0_RUNTIME_URL] : []),
+    ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
+    ...(process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? [`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`]
+      : []),
   ],
-  pages: {
-    signIn: "/login",
-  },
-  callbacks: {
-    authorized: async ({ auth }) => {
-      return !!auth;
-    },
-  },
   session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+    updateAge: 60 * 60 * 24, // 1 day
   },
-};
-
-export async function requireAuth() {
-  const { auth } = await import("@/lib/auth-server");
-  const session = await auth();
-  if (!session) {
-    throw new Error("Unauthorized");
-  }
-  return session;
-}
+  ...(process.env.NODE_ENV === 'development'
+    ? {
+        advanced: {
+          // In dev (v0 preview iframe), force cross-site cookies so the
+          // session cookie is stored by the browser.
+          defaultCookieAttributes: {
+            sameSite: 'none' as const,
+            secure: true,
+          },
+        },
+      }
+    : {}),
+})
