@@ -3,6 +3,7 @@ import { getServerSession } from "@/lib/auth-session";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
 import { createMetadata } from "@/lib/metadata";
+import { isSignUpDisabled } from "@/lib/app-config";
 
 export const metadata = createMetadata({
   title: "Sign In",
@@ -17,7 +18,7 @@ export default async function SignInPage() {
 
   return (
     <Suspense>
-      <AuthForm mode="sign-in" />
+      <AuthForm mode="sign-in" signUpDisabled={isSignUpDisabled()} />
     </Suspense>
   );
 }

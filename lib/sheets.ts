@@ -98,7 +98,11 @@ export async function listSpreadsheetTabs(spreadsheetId: string) {
   )
 }
 
-export async function getSheetData(range: string, spreadsheetId?: string): Promise<any[][]> {
+export async function getSheetData(
+  range: string,
+  spreadsheetId?: string,
+  options?: { silent?: boolean }
+): Promise<any[][]> {
   const config = getSheetsConfig()
   const sheetId =
     spreadsheetId ||
@@ -120,7 +124,11 @@ export async function getSheetData(range: string, spreadsheetId?: string): Promi
 
     return response.data.values || []
   } catch (error) {
-    logger.error(`[Sheets] Failed to read ${range}`, error)
+    if (options?.silent) {
+      logger.debug(`[Sheets] Optional read skipped for ${range}`)
+    } else {
+      logger.error(`[Sheets] Failed to read ${range}`, error)
+    }
     throw error
   }
 }

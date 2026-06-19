@@ -49,23 +49,33 @@ function formatKenyaPhone(phone: string) {
   return digits
 }
 
-async function fetchSourceRows(source: SheetSourceConfig): Promise<Row[]> {
+async function fetchSourceRows(source: SheetSourceConfig, silent = false): Promise<Row[]> {
   const tab = await resolveTabName(source.spreadsheetId, source.gid, source.tab)
   const range = buildA1Range(tab, source.range || 'A:Z')
-  return getSheetData(range, source.spreadsheetId)
+  try {
+    return await getSheetData(range, source.spreadsheetId, { silent })
+  } catch {
+    return []
+  }
 }
 
-async function fetchAllSourceRows(dataType: SheetDataType): Promise<
-  Array<{ source: SheetSourceConfig; rows: Row[] }>
-> {
+async function fetchAllSourceRows(
+  dataType: SheetDataType,
+  options?: { silent?: boolean }
+): Promise<Array<{ source: SheetSourceConfig; rows: Row[] }>> {
   const sources = getSourcesForType(dataType)
+  if (sources.length === 0) return []
+
+  const silent = options?.silent ?? false
   const results = await Promise.all(
     sources.map(async (source) => {
       try {
-        const rows = await fetchSourceRows(source)
+        const rows = await fetchSourceRows(source, silent)
         return { source, rows }
       } catch (error) {
-        logger.warn(`[Sheets] Failed to read ${dataType} from ${source.label}`, error)
+        if (!silent) {
+          logger.warn(`[Sheets] Failed to read ${dataType} from ${source.label}`, error)
+        }
         return { source, rows: [] as Row[] }
       }
     })
@@ -144,7 +154,7 @@ export async function getAllContacts(): Promise<Contact[]> {
 }
 
 export async function getAllCampaigns(): Promise<Campaign[]> {
-  const batches = await fetchAllSourceRows('analytics')
+  const batches = await fetchAllSourceRows('analytics', { silent: true })
   const campaigns: Campaign[] = []
 
   for (const { rows } of batches) {
@@ -211,7 +221,7 @@ export async function getAllTemplates(): Promise<MessageTemplate[]> {
 }
 
 export async function getAllSyncLogs(): Promise<SyncLog[]> {
-  const batches = await fetchAllSourceRows('syncLog')
+  const batches = await fetchAllSourceRows('syncLog', { silent: true })
   const logs: SyncLog[] = []
 
   for (const { rows } of batches) {

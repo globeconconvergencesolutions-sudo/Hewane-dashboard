@@ -7,6 +7,8 @@ import {
   getLatestSyncLog,
 } from '@/lib/sheet-data'
 import { DashboardStats } from '@/lib/types'
+import { getIntegrationsStatus } from '@/lib/app-config'
+import { isSheetsConfigured } from '@/lib/sheets-config'
 import logger, { errorLogger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
@@ -19,9 +21,11 @@ export async function GET(request: NextRequest) {
     logger.debug('[API] GET /api/stats called')
 
     let totalContacts = 0
+    let contactsCachedAt: Date | null = null
     try {
-      const { contacts } = await getCachedContacts()
+      const { contacts, cachedAt } = await getCachedContacts()
       totalContacts = contacts.length
+      contactsCachedAt = cachedAt
     } catch (error) {
       logger.warn('[API] Failed to fetch contacts', error)
       try {
@@ -60,7 +64,7 @@ export async function GET(request: NextRequest) {
         ? `${((deliveredThisMonth / totalProcessed) * 100).toFixed(1)}%`
         : 'N/A'
 
-    let lastSync: Date | null = null
+    let lastSync: Date | null = contactsCachedAt
     let syncHealth: DashboardStats['syncHealth'] = 'healthy'
 
     try {
@@ -73,11 +77,19 @@ export async function GET(request: NextRequest) {
         if (hoursSinceSync > 24) {
           syncHealth = 'warning'
         }
+      } else if (contactsCachedAt) {
+        const hoursSinceCache = (Date.now() - contactsCachedAt.getTime()) / (1000 * 60 * 60)
+        if (hoursSinceCache > 24) {
+          syncHealth = 'warning'
+        }
       }
     } catch (error) {
-      logger.warn('[API] Failed to fetch sync log', error)
-      syncHealth = 'error'
+      logger.debug('[API] Sync log unavailable', error)
     }
+
+    const workflowStatus = getIntegrationsStatus(isSheetsConfigured()).n8n.syncConfigured
+      ? 'running'
+      : 'stopped'
 
     const stats: DashboardStats = {
       totalContacts,
@@ -87,7 +99,7 @@ export async function GET(request: NextRequest) {
       successRate,
       lastSync,
       syncHealth,
-      workflowStatus: 'running',
+      workflowStatus,
     }
 
     logger.info('[API] Stats returned successfully', stats)

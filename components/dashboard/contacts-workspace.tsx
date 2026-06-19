@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Contact, PaginatedContactsResponse } from "@/lib/types";
 import type { ContactSortField } from "@/lib/contacts-query";
+import type { IntegrationsStatus } from "@/lib/app-config";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
@@ -184,10 +185,22 @@ export function ContactsWorkspace() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [validateLoading, setValidateLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
+  const [integrations, setIntegrations] = useState<IntegrationsStatus | null>(null);
 
   const debouncedQ = useDebounce(query.q, 300);
   const toastRef = useRef(toast);
   toastRef.current = toast;
+
+  useEffect(() => {
+    fetch("/api/integrations/status")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setIntegrations(data as IntegrationsStatus);
+      })
+      .catch(() => {});
+  }, []);
+
+  const syncDisabledReason = integrations?.n8n.syncDisabledReason ?? null;
 
   const fetchContacts = useCallback(
     async (nextQuery: QueryState, refresh = false, signal?: AbortSignal) => {
@@ -291,26 +304,39 @@ export function ContactsWorkspace() {
   };
 
   const handleSync = async () => {
+    if (syncDisabledReason) {
+      toast({ title: "Sync unavailable", description: syncDisabledReason, variant: "destructive" });
+      return;
+    }
     setSyncLoading(true);
     try {
       const res = await fetch("/api/sync", { method: "POST" });
-      if (!res.ok) throw new Error("sync failed");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((body.error as string) || "Sync failed");
       const result = await fetchContacts({ ...query, q: debouncedQ }, true);
       setData(result);
-      toast({ title: "Sync complete", description: "Contacts updated from Google Sheets." });
-    } catch {
-      toast({ title: "Sync failed", variant: "destructive" });
+      toast({ title: "Sync complete", description: "n8n sync workflow finished. Contacts refreshed." });
+    } catch (error) {
+      toast({
+        title: "Sync failed",
+        description: error instanceof Error ? error.message : "Could not run sync workflow.",
+        variant: "destructive",
+      });
     } finally {
       setSyncLoading(false);
     }
   };
 
   const handleValidate = async () => {
+    if (syncDisabledReason) {
+      toast({ title: "Validate unavailable", description: syncDisabledReason, variant: "destructive" });
+      return;
+    }
     setValidateLoading(true);
     try {
       const res = await fetch("/api/contacts/validate", { method: "POST" });
       const body = await res.json();
-      if (!res.ok) throw new Error("validate failed");
+      if (!res.ok) throw new Error((body.error as string) || "Validation failed");
       if (body.valid) {
         toast({ title: "Validation passed", description: "All contacts look good." });
       } else {
@@ -320,8 +346,12 @@ export function ContactsWorkspace() {
           variant: "destructive",
         });
       }
-    } catch {
-      toast({ title: "Validation failed", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Validation failed",
+        description: error instanceof Error ? error.message : "Could not run validation workflow.",
+        variant: "destructive",
+      });
     } finally {
       setValidateLoading(false);
     }
@@ -385,15 +415,17 @@ export function ContactsWorkspace() {
               variant="outline"
               className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
               onClick={handleValidate}
-              disabled={validateLoading}
+              disabled={validateLoading || Boolean(syncDisabledReason)}
+              title={syncDisabledReason ?? undefined}
             >
               <ShieldCheck className="mr-2 size-4" />
               {validateLoading ? "Validating..." : "Validate"}
             </Button>
             <Button
-              className="bg-[#E8B825] text-[#1a1a2e] hover:bg-[#f0c84a]"
+              className="bg-[#E8B825] text-[#1a1a2e] hover:bg-[#f0c84a] disabled:opacity-60"
               onClick={handleSync}
-              disabled={syncLoading}
+              disabled={syncLoading || Boolean(syncDisabledReason)}
+              title={syncDisabledReason ?? undefined}
             >
               <Upload className="mr-2 size-4" />
               {syncLoading ? "Syncing..." : "Sync Sheets"}
@@ -401,6 +433,15 @@ export function ContactsWorkspace() {
           </>
         }
       />
+
+      {syncDisabledReason ? (
+        <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+          <CardContent className="p-4 text-sm text-amber-950 dark:text-amber-100">
+            Validate and Sync Sheets need n8n Workflow B. {syncDisabledReason} Refresh still loads contacts
+            directly from Google Sheets.
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -13,6 +13,7 @@ import { PageHero } from "@/components/dashboard/page-hero";
 import { SEGMENTS, DELIVERY_SPEEDS } from "@/lib/constants";
 import { MessageTemplate } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import type { IntegrationsStatus } from "@/lib/app-config";
 import {
   Send,
   Pause,
@@ -55,6 +56,7 @@ export default function BroadcastPage() {
 
   const [startLoading, setStartLoading] = useState(false);
   const [controlLoading, setControlLoading] = useState(false);
+  const [integrations, setIntegrations] = useState<IntegrationsStatus | null>(null);
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === templateId),
@@ -85,6 +87,17 @@ export default function BroadcastPage() {
   }, [fetchTemplates]);
 
   useEffect(() => {
+    fetch("/api/integrations/status")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setIntegrations(data as IntegrationsStatus);
+      })
+      .catch(() => {});
+  }, []);
+
+  const broadcastDisabledReason = integrations?.n8n.broadcastDisabledReason ?? null;
+
+  useEffect(() => {
     const fromUrl = searchParams.get("templateId");
     if (fromUrl && templates.length > 0) {
       const match = templates.find((t) => t.id === fromUrl);
@@ -103,6 +116,7 @@ export default function BroadcastPage() {
   }, [messageType, selectedTemplate]);
 
   const canStart =
+    !broadcastDisabledReason &&
     campaignName.trim().length > 0 &&
     (messageType === "custom" ? messageBody.trim().length > 0 : Boolean(templateId));
 
@@ -129,6 +143,10 @@ export default function BroadcastPage() {
 
   const handleStartBroadcast = async () => {
     if (!canStart) return;
+    if (broadcastDisabledReason) {
+      toast({ title: "Broadcast unavailable", description: broadcastDisabledReason, variant: "destructive" });
+      return;
+    }
 
     setStartLoading(true);
     setStatusMessage("Starting campaign…");
@@ -255,6 +273,14 @@ export default function BroadcastPage() {
           </Button>
         }
       />
+
+      {broadcastDisabledReason ? (
+        <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+          <CardContent className="p-4 text-sm text-amber-950 dark:text-amber-100">
+            Broadcast needs n8n Workflow A. {broadcastDisabledReason}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -395,6 +421,7 @@ export default function BroadcastPage() {
                 <Button
                   onClick={handleStartBroadcast}
                   disabled={isRunning || startLoading || !canStart}
+                  title={broadcastDisabledReason ?? undefined}
                   className="min-w-[160px] flex-1 bg-[#7D3F7E] hover:bg-[#6a356b]"
                 >
                   <Send className="mr-2 size-4" />

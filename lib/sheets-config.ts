@@ -137,10 +137,10 @@ export function getSheetsConfig(): SheetsConfig | null {
     return null
   }
 
-  // Fill operational tabs from primary spreadsheet when not explicitly configured
+  // Optional operational tabs — only auto-fill when empty; SyncLog is truly optional
   const primaryId = merged.primarySpreadsheetId || merged.contacts[0]?.spreadsheetId
 
-  for (const dataType of ['analytics', 'templates', 'syncLog'] as const) {
+  for (const dataType of ['analytics', 'templates'] as const) {
     if (merged[dataType].length === 0 && primaryId) {
       merged[dataType] = [
         {

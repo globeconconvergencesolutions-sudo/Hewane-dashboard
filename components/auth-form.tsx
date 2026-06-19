@@ -13,7 +13,13 @@ import { Mail, Lock, User, Sparkles } from 'lucide-react'
 const AUTH_IMAGE =
   'https://images.unsplash.com/photo-1511379938545-c1f69419868d?auto=format&fit=crop&w=1400&q=80'
 
-export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
+export function AuthForm({
+  mode,
+  signUpDisabled = false,
+}: {
+  mode: 'sign-in' | 'sign-up'
+  signUpDisabled?: boolean
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [name, setName] = useState('')
@@ -191,13 +197,23 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
               </form>
 
               <p className="mt-6 border-t pt-6 text-center text-sm text-muted-foreground">
-                {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-                <Link
-                  href={isSignUp ? '/sign-in' : '/sign-up'}
-                  className="font-semibold text-primary hover:underline"
-                >
-                  {isSignUp ? 'Sign in' : 'Sign up'}
-                </Link>
+                {isSignUp ? (
+                  <>
+                    Already have an account?{' '}
+                    <Link href="/sign-in" className="font-semibold text-primary hover:underline">
+                      Sign in
+                    </Link>
+                  </>
+                ) : signUpDisabled ? (
+                  <>Don&apos;t have an account? Contact an administrator for access.</>
+                ) : (
+                  <>
+                    Don&apos;t have an account?{' '}
+                    <Link href="/sign-up" className="font-semibold text-primary hover:underline">
+                      Sign up
+                    </Link>
+                  </>
+                )}
               </p>
             </CardContent>
           </Card>
