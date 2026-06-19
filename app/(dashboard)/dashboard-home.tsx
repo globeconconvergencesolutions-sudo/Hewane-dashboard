@@ -1,0 +1,184 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PageHero } from "@/components/dashboard/page-hero";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardStats } from "@/lib/types";
+import {
+  ArrowRight,
+  BarChart3,
+  MessageSquare,
+  Send,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+
+export default function DashboardHome() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch("/api/stats");
+        if (res.ok) setStats(await res.json());
+      } catch (error) {
+        console.error("[Dashboard] Failed to fetch stats:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const syncColor =
+    stats?.syncHealth === "healthy"
+      ? "text-emerald-600"
+      : stats?.syncHealth === "warning"
+        ? "text-amber-600"
+        : "text-red-600";
+
+  return (
+    <div className="space-y-6">
+      <PageHero
+        title="Dashboard Overview"
+        description="Monitor contacts, campaign health, and Google Sheets sync status at a glance."
+        actions={
+          <>
+            <Button
+              asChild
+              variant="outline"
+              className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+            >
+              <Link href="/contacts">View contacts</Link>
+            </Button>
+            <Button asChild className="bg-[#E8B825] text-[#1a1a2e] hover:bg-[#f0c84a]">
+              <Link href="/broadcast">Start broadcast</Link>
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {loading ? (
+          [...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)
+        ) : (
+          <>
+            <StatCard
+              label="Total contacts"
+              value={stats?.totalContacts ?? 0}
+              hint="Across connected sheets"
+              icon={<Users className="size-5 text-primary" />}
+              iconClassName="bg-primary/10 text-primary"
+            />
+            <StatCard
+              label="Messages this month"
+              value={stats?.messagesThisMonth ?? 0}
+              hint={`${stats?.deliveredThisMonth ?? 0} delivered`}
+              icon={<MessageSquare className="size-5 text-emerald-700" />}
+              iconClassName="bg-emerald-100 text-emerald-700"
+            />
+            <StatCard
+              label="Success rate"
+              value={stats?.successRate ?? "N/A"}
+              hint="Delivered vs sent"
+              icon={<TrendingUp className="size-5 text-[#7D3F7E]" />}
+              iconClassName="bg-[#7D3F7E]/10 text-[#7D3F7E]"
+              valueClassName="text-[#7D3F7E]"
+            />
+            <StatCard
+              label="Sheets sync"
+              value={<span className="capitalize">{stats?.syncHealth ?? "unknown"}</span>}
+              hint="Google Sheets health"
+              icon={<BarChart3 className="size-5" />}
+              iconClassName="bg-secondary/20 text-secondary-foreground"
+              valueClassName={syncColor}
+            />
+          </>
+        )}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="border-border/80 shadow-sm lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Quick actions</CardTitle>
+            <CardDescription>Jump straight into the workflows you use most.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            {[
+              {
+                href: "/contacts",
+                title: "Manage contacts",
+                desc: "Search, filter, sync sheets",
+                icon: Users,
+              },
+              {
+                href: "/broadcast",
+                title: "Launch broadcast",
+                desc: "Send WhatsApp campaigns",
+                icon: Send,
+              },
+              {
+                href: "/templates",
+                title: "Message templates",
+                desc: "Create reusable messages",
+                icon: MessageSquare,
+              },
+              {
+                href: "/analytics",
+                title: "View analytics",
+                desc: "Track campaign performance",
+                icon: BarChart3,
+              },
+            ].map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className="group flex items-start gap-4 rounded-xl border border-border/80 p-4 transition-all hover:border-primary/20 hover:bg-primary/[0.03]"
+              >
+                <div className="rounded-xl bg-primary/10 p-3 text-primary">
+                  <action.icon className="size-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-foreground">{action.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{action.desc}</p>
+                </div>
+                <ArrowRight className="mt-1 size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/80 shadow-sm">
+          <CardHeader>
+            <CardTitle>System status</CardTitle>
+            <CardDescription>Live operational snapshot</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+              <span className="text-muted-foreground">Workflow</span>
+              <span className="font-medium capitalize">{stats?.workflowStatus ?? "unknown"}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+              <span className="text-muted-foreground">Last sync</span>
+              <span className="font-medium">
+                {stats?.lastSync ? new Date(stats.lastSync).toLocaleString() : "Not yet synced"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+              <span className="text-muted-foreground">Failed this month</span>
+              <span className="font-medium text-red-600">{stats?.failedThisMonth ?? 0}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

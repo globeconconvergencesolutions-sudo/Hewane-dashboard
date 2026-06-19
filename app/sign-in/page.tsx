@@ -1,16 +1,23 @@
-import { auth } from '@/lib/auth'
-import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import { AuthForm } from '@/components/auth-form'
+import { Suspense } from "react";
+import { getServerSession } from "@/lib/auth-session";
+import { redirect } from "next/navigation";
+import { AuthForm } from "@/components/auth-form";
+import { createMetadata } from "@/lib/metadata";
 
-export const metadata = {
-  title: 'Sign In | Hewane School Music Dashboard',
-  description: 'Sign in to manage your campaigns',
-}
+export const metadata = createMetadata({
+  title: "Sign In",
+  description: "Sign in to the Hewane School of Music staff dashboard to manage contacts and WhatsApp campaigns.",
+  path: "/sign-in",
+  noIndex: true,
+});
 
 export default async function SignInPage() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (session?.user) redirect('/')
+  const session = await getServerSession();
+  if (session?.user) redirect("/");
 
-  return <AuthForm mode="sign-in" />
+  return (
+    <Suspense>
+      <AuthForm mode="sign-in" />
+    </Suspense>
+  );
 }

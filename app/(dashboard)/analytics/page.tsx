@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Campaign } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,11 +12,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Download, FileText } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { PageHero } from "@/components/dashboard/page-hero";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { useToast } from "@/hooks/use-toast";
+import { Download, FileText, Send, CheckCircle2, XCircle, TrendingUp } from "lucide-react";
 
 export default function AnalyticsPage() {
+  const { toast } = useToast();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState<string | null>(null);
   const [totalStats, setTotalStats] = useState({
     totalSent: 0,
     totalDelivered: 0,
@@ -24,137 +31,153 @@ export default function AnalyticsPage() {
     avgSuccess: "0%",
   });
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/analytics");
-      if (res.ok) {
-        const data: Campaign[] = await res.json();
-        setCampaigns(data);
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data: Campaign[] = await res.json();
+      setCampaigns(data);
 
-        // Calculate totals
-        const totalSent = data.reduce((sum, c) => sum + c.totalSent, 0);
-        const totalDelivered = data.reduce((sum, c) => sum + c.delivered, 0);
-        const totalFailed = data.reduce((sum, c) => sum + c.failed, 0);
-        const avgSuccess =
-          totalSent > 0 ? `${((totalDelivered / totalSent) * 100).toFixed(1)}%` : "0%";
+      const totalSent = data.reduce((sum, c) => sum + c.totalSent, 0);
+      const totalDelivered = data.reduce((sum, c) => sum + c.delivered, 0);
+      const totalFailed = data.reduce((sum, c) => sum + c.failed, 0);
+      const avgSuccess =
+        totalSent > 0 ? `${((totalDelivered / totalSent) * 100).toFixed(1)}%` : "0%";
 
-        setTotalStats({
-          totalSent,
-          totalDelivered,
-          totalFailed,
-          avgSuccess,
-        });
-      }
-    } catch (error) {
-      console.error("[v0] Failed to fetch analytics:", error);
+      setTotalStats({ totalSent, totalDelivered, totalFailed, avgSuccess });
+    } catch {
+      toast({
+        title: "Could not load analytics",
+        description: "Ensure your Analytics sheet tab is configured.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const handleExport = async (format: "csv" | "excel" | "pdf") => {
+    setExporting(format);
     try {
       const res = await fetch(`/api/analytics/export?format=${format}`);
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `campaigns.${format}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-    } catch (error) {
-      console.error("[v0] Export error:", error);
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `hewane-campaigns.${format === "excel" ? "xlsx" : format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Export ready", description: `Downloaded ${format.toUpperCase()} file.` });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    } finally {
+      setExporting(null);
     }
   };
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [fetchAnalytics]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Analytics</h1>
-          <p className="text-slate-600 mt-2">Campaign performance and metrics</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
-            <Download className="w-4 h-4 mr-2" />
-            CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handleExport("excel")}>
-            <FileText className="w-4 h-4 mr-2" />
-            Excel
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handleExport("pdf")}>
-            <FileText className="w-4 h-4 mr-2" />
-            PDF
-          </Button>
-        </div>
+      <PageHero
+        eyebrow="Performance insights"
+        title="Analytics"
+        description="Review campaign delivery, success rates, and export reports for your records."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+              onClick={() => handleExport("csv")}
+              disabled={Boolean(exporting)}
+            >
+              <Download className="mr-2 size-4" />
+              {exporting === "csv" ? "Exporting…" : "CSV"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+              onClick={() => handleExport("excel")}
+              disabled={Boolean(exporting)}
+            >
+              <FileText className="mr-2 size-4" />
+              Excel
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {loading ? (
+          [...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)
+        ) : (
+          <>
+            <StatCard
+              label="Total sent"
+              value={totalStats.totalSent}
+              icon={<Send className="size-5 text-primary" />}
+              iconClassName="bg-primary/10 text-primary"
+            />
+            <StatCard
+              label="Delivered"
+              value={totalStats.totalDelivered}
+              icon={<CheckCircle2 className="size-5 text-emerald-700" />}
+              iconClassName="bg-emerald-100 text-emerald-700"
+              valueClassName="text-emerald-700"
+            />
+            <StatCard
+              label="Failed"
+              value={totalStats.totalFailed}
+              icon={<XCircle className="size-5 text-red-600" />}
+              iconClassName="bg-red-100 text-red-600"
+              valueClassName="text-red-600"
+            />
+            <StatCard
+              label="Avg success"
+              value={totalStats.avgSuccess}
+              icon={<TrendingUp className="size-5 text-[#7D3F7E]" />}
+              iconClassName="bg-[#7D3F7E]/10 text-[#7D3F7E]"
+              valueClassName="text-[#7D3F7E]"
+            />
+          </>
+        )}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Sent</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalStats.totalSent}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Delivered</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{totalStats.totalDelivered}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Failed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{totalStats.totalFailed}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Avg Success</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{totalStats.avgSuccess}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Campaigns Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Campaign History</CardTitle>
-          <CardDescription>All broadcast campaigns</CardDescription>
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Campaign history</CardTitle>
+            <CardDescription>All broadcast campaigns logged from Google Sheets.</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => handleExport("pdf")} disabled={Boolean(exporting)}>
+            <FileText className="mr-2 size-4" />
+            {exporting === "pdf" ? "Exporting…" : "Export PDF"}
+          </Button>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="space-y-2">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-12 bg-slate-200 rounded animate-pulse" />
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-12 rounded-lg" />
               ))}
             </div>
           ) : (
-            <div className="rounded-lg border overflow-hidden">
+            <div className="overflow-hidden rounded-xl border border-border/80">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead>Campaign</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Group</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead className="text-right">Sent</TableHead>
                     <TableHead className="text-right">Delivered</TableHead>
                     <TableHead className="text-right">Failed</TableHead>
@@ -165,25 +188,41 @@ export default function AnalyticsPage() {
                   {campaigns.length > 0 ? (
                     campaigns.map((campaign) => (
                       <TableRow key={campaign.id}>
-                        <TableCell className="font-medium">{campaign.campaignName}</TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="max-w-[200px] truncate font-medium">
+                          {campaign.campaignName}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
                           {new Date(campaign.date).toLocaleDateString()}
                         </TableCell>
-                        <TableCell className="text-sm">{campaign.contactGroup}</TableCell>
+                        <TableCell>
+                          <Badge variant="muted" className="capitalize">
+                            {campaign.contactGroup}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {campaign.messageType}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-right">{campaign.totalSent}</TableCell>
-                        <TableCell className="text-right text-green-600">
+                        <TableCell className="text-right font-medium text-emerald-600">
                           {campaign.delivered}
                         </TableCell>
-                        <TableCell className="text-right text-red-600">{campaign.failed}</TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className="text-right font-medium text-red-600">
+                          {campaign.failed}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-[#7D3F7E]">
                           {campaign.successRate}
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-slate-600">
-                        No campaigns yet
+                      <TableCell colSpan={8} className="py-16 text-center">
+                        <p className="font-medium text-foreground">No campaigns yet</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Launch your first broadcast to see performance data here.
+                        </p>
                       </TableCell>
                     </TableRow>
                   )}

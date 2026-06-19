@@ -1,15 +1,26 @@
-# v0 sandbox internal files
+# Dependencies & build output
+node_modules/
+.next/
+out/
+
+# Environment (never commit secrets)
+.env
+.env*.local
+
+# OS / editor
+.DS_Store
+*.log
+
+# Docker runtime logs
+logs/
+
+# Archived internal docs (historical only — see docs/archive/README.md)
+docs/archive/
+
+# Legacy v0 sandbox artifacts
 __v0_runtime_loader.js
 __v0_devtools.tsx
 __v0_jsx-dev-runtime.ts
 .snowflake/
 .v0-trash/
 .vercel/
-
-# Environment variables
-.env*.local
-
-# Common ignores
-node_modules
-.next/
-.DS_Store

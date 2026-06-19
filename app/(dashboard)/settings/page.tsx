@@ -1,174 +1,315 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { signOut } from "next-auth/react";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHero } from "@/components/dashboard/page-hero";
+import { authClient, useSession } from "@/lib/auth-client";
 import { TIMEZONE } from "@/lib/constants";
+import {
+  DEFAULT_DASHBOARD_SETTINGS,
+  loadDashboardSettings,
+  saveDashboardSettings,
+  type DashboardSettings,
+} from "@/lib/dashboard-settings";
+import { useToast } from "@/hooks/use-toast";
+import { LogOut, Sheet, Bell, Building2, Shield } from "lucide-react";
+
+type SheetsConfigResponse = {
+  config: {
+    primarySpreadsheetId?: string;
+    contacts: { label?: string; spreadsheetId: string; tab: string; schema?: string }[];
+    analytics: { spreadsheetId: string; tab: string }[];
+    templates: { spreadsheetId: string; tab: string }[];
+    syncLog: { spreadsheetId: string; tab: string }[];
+  };
+  tabsBySpreadsheet: Record<string, { title: string }[]>;
+};
 
 export default function SettingsPage() {
-  const [companyName, setCompanyName] = useState("Hewane School of Music");
-  const [adminEmail, setAdminEmail] = useState("admin@hewaneschoolofmusic.com");
-  const [timezone, setTimezone] = useState(TIMEZONE);
-  const [notifyOnComplete, setNotifyOnComplete] = useState(true);
-  const [notifyOnError, setNotifyOnError] = useState(true);
+  const { toast } = useToast();
+  const { data: session } = useSession();
+
+  const [settings, setSettings] = useState<DashboardSettings>(DEFAULT_DASHBOARD_SETTINGS);
+  const [sheetsConfig, setSheetsConfig] = useState<SheetsConfigResponse | null>(null);
+  const [sheetsLoading, setSheetsLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setSettings(loadDashboardSettings());
+    setHydrated(true);
+  }, []);
+
+  const fetchSheetsConfig = useCallback(async () => {
+    try {
+      setSheetsLoading(true);
+      const res = await fetch("/api/sheets/config");
+      if (res.ok) {
+        setSheetsConfig(await res.json());
+      }
+    } catch {
+      toast({
+        title: "Could not load sheet configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setSheetsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchSheetsConfig();
+  }, [fetchSheetsConfig]);
 
   const handleSaveSettings = async () => {
     setSaveLoading(true);
-    // TODO: Save to backend
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setSaveLoading(false);
+    try {
+      saveDashboardSettings(settings);
+      toast({
+        title: "Settings saved",
+        description: "Your preferences are stored on this device.",
+      });
+    } finally {
+      setSaveLoading(false);
+    }
   };
+
+  const handleReset = () => {
+    setSettings(DEFAULT_DASHBOARD_SETTINGS);
+    saveDashboardSettings(DEFAULT_DASHBOARD_SETTINGS);
+    toast({ title: "Settings reset to defaults" });
+  };
+
+  if (!hydrated) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-40 rounded-2xl" />
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    );
+  }
+
+  const adminEmail = session?.user?.email ?? "admin@hewaneschoolofmusic.com";
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-600 mt-2">Configure your dashboard and preferences</p>
-      </div>
+      <PageHero
+        eyebrow="Configuration"
+        title="Settings"
+        description="Manage organization preferences, connected spreadsheets, and notification options."
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Settings Form */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* General Settings */}
-          <Card>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <Card className="border-border/80 shadow-sm">
             <CardHeader>
-              <CardTitle>General Settings</CardTitle>
-              <CardDescription>Organization information</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="size-5 text-primary" />
+                General settings
+              </CardTitle>
+              <CardDescription>Organization information displayed across the dashboard.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Organization Name</label>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Organization name</label>
                 <Input
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="mt-1"
+                  value={settings.companyName}
+                  onChange={(e) => setSettings({ ...settings, companyName: e.target.value })}
                 />
               </div>
 
-              <div>
-                <label className="text-sm font-medium">WhatsApp Business Number</label>
-                <Input
-                  value="+254712345678"
-                  disabled
-                  className="mt-1 bg-slate-100"
-                />
-                <p className="text-xs text-slate-600 mt-1">Configured by your administrator</p>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">WhatsApp business number</label>
+                <Input value="+254712345678" disabled className="bg-muted/50" />
+                <p className="text-xs text-muted-foreground">
+                  Configured in n8n / Meta Business — contact your administrator to change.
+                </p>
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Timezone</label>
-                <select className="w-full rounded-lg border border-input p-2 text-sm mt-1">
+                <Select
+                  value={settings.timezone}
+                  onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+                >
                   <option value={TIMEZONE}>{TIMEZONE}</option>
-                </select>
+                </Select>
               </div>
             </CardContent>
           </Card>
 
-          {/* Admin Settings */}
-          <Card>
+          <Card className="border-border/80 shadow-sm">
             <CardHeader>
-              <CardTitle>Admin Account</CardTitle>
-              <CardDescription>Your login credentials</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="size-5 text-[#7D3F7E]" />
+                Admin account
+              </CardTitle>
+              <CardDescription>Your signed-in credentials (managed via Better Auth).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Admin Email</label>
-                <Input
-                  type="email"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  className="mt-1"
-                />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Admin email</label>
+                <Input type="email" value={adminEmail} disabled className="bg-muted/50" />
               </div>
-
-              <div>
-                <label className="text-sm font-medium">Change Password</label>
-                <Input
-                  type="password"
-                  placeholder="New password"
-                  className="mt-1"
-                />
-              </div>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" defaultChecked />
-                <span className="text-sm">Enable Two-Factor Authentication</span>
-              </label>
+              <p className="text-sm text-muted-foreground">
+                Password changes and two-factor authentication are managed through your auth provider
+                configuration.
+              </p>
             </CardContent>
           </Card>
 
-          {/* Notifications */}
-          <Card>
+          <Card className="border-border/80 shadow-sm">
             <CardHeader>
-              <CardTitle>Notifications</CardTitle>
-              <CardDescription>Email notification preferences</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="size-5 text-[#E8B825]" />
+                Notifications
+              </CardTitle>
+              <CardDescription>Email notification preferences (stored locally).</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <CardContent className="space-y-3">
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/80 p-4">
                 <input
                   type="checkbox"
-                  checked={notifyOnComplete}
-                  onChange={(e) => setNotifyOnComplete(e.target.checked)}
+                  className="mt-1"
+                  checked={settings.notifyOnComplete}
+                  onChange={(e) =>
+                    setSettings({ ...settings, notifyOnComplete: e.target.checked })
+                  }
                 />
-                <span className="text-sm">Notify when broadcast completes</span>
+                <span>
+                  <span className="block text-sm font-medium">Broadcast complete</span>
+                  <span className="text-sm text-muted-foreground">
+                    Notify when a campaign finishes sending.
+                  </span>
+                </span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/80 p-4">
                 <input
                   type="checkbox"
-                  checked={notifyOnError}
-                  onChange={(e) => setNotifyOnError(e.target.checked)}
+                  className="mt-1"
+                  checked={settings.notifyOnError}
+                  onChange={(e) => setSettings({ ...settings, notifyOnError: e.target.checked })}
                 />
-                <span className="text-sm">Notify on sync or broadcast errors</span>
+                <span>
+                  <span className="block text-sm font-medium">Errors & sync issues</span>
+                  <span className="text-sm text-muted-foreground">
+                    Notify on sync failures or broadcast errors.
+                  </span>
+                </span>
               </label>
             </CardContent>
           </Card>
 
-          <div className="flex gap-2">
+          <Card className="border-border/80 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sheet className="size-5 text-primary" />
+                Connected spreadsheets
+              </CardTitle>
+              <CardDescription>
+                Live configuration from <code className="text-xs">sheets.config.json</code>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {sheetsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-16 rounded-lg" />
+                  <Skeleton className="h-16 rounded-lg" />
+                </div>
+              ) : sheetsConfig ? (
+                <div className="space-y-3">
+                  {sheetsConfig.config.contacts.map((source, i) => (
+                    <div
+                      key={`${source.spreadsheetId}-${i}`}
+                      className="rounded-xl border border-border/80 bg-muted/20 p-4"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{source.label || `Contact source ${i + 1}`}</p>
+                        {source.schema ? (
+                          <Badge variant="outline" className="font-mono text-[10px]">
+                            {source.schema}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {source.spreadsheetId} · tab: {source.tab}
+                      </p>
+                    </div>
+                  ))}
+                  {sheetsConfig.config.primarySpreadsheetId ? (
+                    <p className="text-xs text-muted-foreground">
+                      Primary spreadsheet for writes:{" "}
+                      <span className="font-mono">{sheetsConfig.config.primarySpreadsheetId}</span>
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Google Sheets is not configured. Add credentials and sheets.config.json.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex flex-wrap gap-2">
             <Button onClick={handleSaveSettings} disabled={saveLoading}>
-              {saveLoading ? "Saving..." : "Save Settings"}
+              {saveLoading ? "Saving…" : "Save settings"}
             </Button>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline" onClick={handleReset}>
+              Reset defaults
+            </Button>
           </div>
         </div>
 
-        {/* Info Sidebar */}
         <div className="space-y-4">
-          <Card>
+          <Card className="border-border/80 shadow-sm">
             <CardHeader>
-              <CardTitle>Dashboard Info</CardTitle>
+              <CardTitle>Dashboard info</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="space-y-4 text-sm">
               <div>
-                <p className="text-slate-600">Version</p>
+                <p className="text-muted-foreground">Version</p>
                 <p className="font-medium">1.0.0</p>
               </div>
               <div>
-                <p className="text-slate-600">Last Updated</p>
-                <p className="font-medium">June 18, 2026</p>
+                <p className="text-muted-foreground">Environment</p>
+                <p className="font-medium">Production dashboard</p>
               </div>
               <div>
-                <p className="text-slate-600">Support</p>
+                <p className="text-muted-foreground">Support</p>
                 <p className="font-medium">support@hewane.com</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-red-200/80 bg-red-50/50 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-red-900">Danger Zone</CardTitle>
+              <CardTitle className="text-red-900">Session</CardTitle>
+              <CardDescription className="text-red-800/70">
+                Sign out from this device
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent>
               <Button
                 variant="destructive"
                 className="w-full"
                 onClick={async () => {
-                  await signOut({ redirect: true, redirectUrl: "/login" });
+                  await authClient.signOut({
+                    fetchOptions: {
+                      onSuccess: () => {
+                        window.location.href = "/sign-in";
+                      },
+                    },
+                  });
                 }}
               >
+                <LogOut className="mr-2 size-4" />
                 Logout
               </Button>
             </CardContent>

@@ -1,70 +1,67 @@
 version: '3.8'
 
 services:
-  # Next.js Dashboard Application
+  postgres:
+    image: postgres:16-alpine
+    container_name: hewane-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hewane
+      POSTGRES_PASSWORD: hewane_dev_password
+      POSTGRES_DB: hewane_dashboard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hewane -d hewane_dashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hewane-network
+
   dashboard:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: hewane-dashboard
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
-      # n8n Webhook URLs (server-side only)
-      - N8N_WORKFLOW_A_URL=https://n8n.hewaneschoolofmusic.com/webhook/hewane-sheets-sync
-      - N8N_WORKFLOW_B_URL=https://n8n.hewaneschoolofmusic.com/webhook/hewane-broadcast-trigger
-      
-      # n8n REST API
-      - N8N_BASE_URL=https://n8n.hewaneschoolofmusic.com
-      - N8N_API_KEY=${N8N_API_KEY}
-      
-      # Google Sheets
-      - GOOGLE_SHEETS_ID=${GOOGLE_SHEETS_ID}
-      - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}
-      - GOOGLE_SERVICE_ACCOUNT_KEY=${GOOGLE_SERVICE_ACCOUNT_KEY}
-      
-      # NextAuth
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=https://dashboard.hewaneschoolofmusic.com
-      
-      # Admin Credentials
-      - ADMIN_EMAIL=${ADMIN_EMAIL}
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
-      
-      # Node Environment
-      - NODE_ENV=production
+      DATABASE_URL: postgresql://hewane:hewane_dev_password@postgres:5432/hewane_dashboard
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_NAME: ${ADMIN_NAME:-Hewane Admin}
+      DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      N8N_WORKFLOW_A_URL: ${N8N_WORKFLOW_A_URL}
+      N8N_WORKFLOW_B_URL: ${N8N_WORKFLOW_B_URL}
+      N8N_BASE_URL: ${N8N_BASE_URL}
+      N8N_API_KEY: ${N8N_API_KEY}
+      GOOGLE_SERVICE_ACCOUNT_EMAIL: ${GOOGLE_SERVICE_ACCOUNT_EMAIL}
+      GOOGLE_SERVICE_ACCOUNT_KEY: ${GOOGLE_SERVICE_ACCOUNT_KEY}
+      NODE_ENV: production
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/login"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/sign-in"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 10s
     volumes:
-      - ./logs:/app/logs
+      - ./sheets.config.json:/app/sheets.config.json:ro
     networks:
       - hewane-network
-
-  # Optional: n8n instance (if self-hosted on same VPS)
-  # n8n:
-  #   image: n8nio/n8n:latest
-  #   container_name: hewane-n8n
-  #   restart: unless-stopped
-  #   ports:
-  #     - "5678:5678"
-  #   environment:
-  #     - N8N_HOST=n8n.hewaneschoolofmusic.com
-  #     - N8N_PORT=443
-  #     - N8N_PROTOCOL=https
-  #     - WEBHOOK_URL=https://n8n.hewaneschoolofmusic.com/
-  #   volumes:
-  #     - n8n-data:/home/node/.n8n
-  #   networks:
-  #     - hewane-network
 
 networks:
   hewane-network:
     driver: bridge
 
 volumes:
-  n8n-data:
+  postgres-data:

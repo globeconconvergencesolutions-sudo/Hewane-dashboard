@@ -1,0 +1,38 @@
+{
+  "primarySpreadsheetId": "14dMNh7bIS0q6bPfO-xFhh8NGUzjvwrWqsEq-YTbYhFo",
+  "contacts": [
+    {
+      "spreadsheetId": "14dMNh7bIS0q6bPfO-xFhh8NGUzjvwrWqsEq-YTbYhFo",
+      "gid": 516143792,
+      "tab": "Hewane CONTACTS 1",
+      "range": "A:D",
+      "label": "Contact List 1",
+      "schema": "google-contacts",
+      "headers": {
+        "name": "Phonetic First Name",
+        "phone": "Phone 1 - Value"
+      },
+      "columns": {
+        "name": 0,
+        "phone": 2
+      }
+    },
+    {
+      "spreadsheetId": "1V3P8Ic0eZrSjnmeVyWYJCC5lkw71AFiK6XdhtcxHoJ8",
+      "gid": 2130780646,
+      "tab": "Sheet1",
+      "range": "A:D",
+      "label": "Contact List 2",
+      "schema": "google-contacts",
+      "headers": {
+        "phone": "Phone number"
+      },
+      "columns": {
+        "phone": 1
+      }
+    }
+  ],
+  "analytics": [],
+  "templates": [],
+  "syncLog": []
+}

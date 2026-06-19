@@ -1,273 +1,237 @@
-# Hewane School of Music - Dashboard
+# Hewane School of Music — Staff Dashboard
 
-A modern WhatsApp Broadcast & Contact Management Dashboard for the Hewane School of Music. Manage contacts, create message templates, schedule broadcasts, and track analytics—all in one place.
+Staff-only web app for managing **Google Sheets contacts**, **WhatsApp broadcast campaigns**, **message templates**, and **campaign analytics**. The dashboard talks to **n8n** for automation and to **Google Sheets** for data.
 
-## 🚀 Features
+Built for demo and ongoing development — suitable to share with colleagues for review before production hardening.
 
-### Core Functionality
-- **Dashboard Home** - Real-time KPIs and system health status
-- **Contacts Management** - View, import, validate, and sync contacts with Google Sheets
-- **Message Templates** - Create reusable templates with variable support
-- **Broadcast Campaigns** - Schedule WhatsApp broadcasts with multiple delivery speeds
-- **Analytics** - Track campaign performance and export reports
-- **Settings** - Configure organization settings, notifications, and admin preferences
+---
 
-### Technology Stack
-- **Frontend**: Next.js 16 (App Router) + React 19 + TypeScript
-- **UI Components**: shadcn/ui with Tailwind CSS v4
-- **Data Management**: React Hook Form + TanStack Table
-- **Backend**: Next.js API Routes + Google Sheets API
-- **Authentication**: NextAuth v5 (email/password)
-- **Infrastructure**: Docker + Nginx + Cloudflare SSL on Contabo VPS
-- **Integrations**: n8n for workflow automation, Google Sheets for data storage
-- **Logging**: tslog for structured logging
-
-## 📋 Project Structure
-
-```
-/app
-  /api                          # API Routes (10 endpoints)
-    /auth/[...nextauth]        # NextAuth handler
-    /stats                      # Dashboard KPIs
-    /contacts                   # Contact CRUD & validation
-    /sync                       # Google Sheets sync
-    /templates                  # Template management
-    /broadcast                  # Campaign control
-    /analytics                  # Metrics & export
-  /(dashboard)                  # Protected routes
-    /page.tsx                   # Dashboard home
-    /contacts/page.tsx          # Contacts list
-    /templates/page.tsx         # Message templates
-    /broadcast/page.tsx         # Create campaign
-    /analytics/page.tsx         # Reports & analytics
-    /settings/page.tsx          # Configuration
-  /login/page.tsx               # Login page
-  /layout.tsx                   # Root layout
-
-/components
-  /ui                           # shadcn/ui components
-  /dashboard                    # Dashboard-specific components
-    /sidebar.tsx                # Navigation sidebar
-    /contacts-table.tsx         # Contact table with TanStack
-
-/lib
-  /types.ts                     # TypeScript interfaces
-  /auth.ts                      # NextAuth configuration
-  /sheets.ts                    # Google Sheets client
-  /logger.ts                    # Structured logging
-  /constants.ts                 # App constants
-
-/hooks
-  /use-toast.ts                 # Toast notifications (sonner)
-```
-
-## 🔧 Installation & Setup
+## Quick start (local)
 
 ### Prerequisites
-- Node.js 18+
-- pnpm (package manager)
-- Google Cloud project with Sheets API enabled
-- n8n instance (self-hosted or cloud)
 
-### Local Development
+- **Node.js 20+** and **pnpm**
+- **PostgreSQL** (Neon, Docker, or local)
+- **Google Cloud service account** with Sheets API access
+- **n8n** with the two Hewane workflows imported (see below)
 
-1. **Clone & Install**
+### 1. Install and configure
+
 ```bash
-git clone <repo-url>
-cd hewane-dashboard
+cd Hewane-dashboard
 pnpm install
-```
-
-2. **Environment Setup**
-```bash
 cp .env.example .env.local
-
-# Set required variables:
-# NEXTAUTH_SECRET=<generate with: openssl rand -base64 32>
-# NEXTAUTH_URL=http://localhost:3000
-# GOOGLE_SHEETS_ID=<your-spreadsheet-id>
-# GOOGLE_SERVICE_ACCOUNT_EMAIL=<service-account-email>
-# GOOGLE_PRIVATE_KEY=<base64-encoded-private-key>
-# N8N_WEBHOOK_URL=<your-n8n-webhook>
-# N8N_API_KEY=<your-n8n-api-key>
 ```
 
-3. **Setup Google Sheets**
-   - Create a new Google Sheet with 4 tabs:
-     - `Contacts` (columns: Email, Phone, Name, Segment, Added)
-     - `Analytics` (columns: CampaignID, Name, Date, Sent, Delivered, Failed)
-     - `SyncLog` (columns: Timestamp, Action, Status, RecordCount)
-     - `Templates` (columns: ID, Name, Body, Variables, Created)
+Edit `.env.local`:
 
-4. **Run Dev Server**
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `BETTER_AUTH_SECRET` | Yes | Session signing (`openssl rand -base64 32`) |
+| `BETTER_AUTH_URL` | Yes | App URL in browser (e.g. `http://localhost:3000`) |
+| `NEXT_PUBLIC_SITE_URL` | Yes | Same as above for SEO / Open Graph |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Yes | Service account client email |
+| `GOOGLE_SERVICE_ACCOUNT_KEY` | Yes | Private key (`\n` for newlines) |
+| `N8N_WORKFLOW_A_URL` | For sync | Webhook `…/hewane-sheets-sync` |
+| `N8N_WORKFLOW_B_URL` | For broadcast | Webhook `…/hewane-broadcast-trigger` |
+| `N8N_BASE_URL` | Optional | n8n host (pause/stop controls) |
+| `N8N_API_KEY` | Optional | n8n API key for pause/stop |
+
+Share **every spreadsheet** in `sheets.config.json` with the service account as **Editor**.
+
+### 2. Database seed (first run)
+
+```bash
+pnpm db:setup
+```
+
+Creates the admin user from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env.local`.
+
+### 3. Run
+
 ```bash
 pnpm dev
 ```
 
-Visit `http://localhost:3000/login` (Default: admin@hewane.com / password123)
+Open [http://localhost:3000/sign-in](http://localhost:3000/sign-in)
 
-## 🔌 API Routes Reference
-
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/api/stats` | GET | Dashboard KPIs |
-| `/api/contacts` | GET/POST | Contact operations |
-| `/api/contacts/validate` | POST | Validation-only sync |
-| `/api/sync` | POST | Trigger n8n Workflow A |
-| `/api/templates` | GET/POST | Template CRUD |
-| `/api/broadcast/start` | POST | Start broadcast |
-| `/api/broadcast/pause` | POST | Pause broadcast |
-| `/api/broadcast/stop` | POST | Stop broadcast |
-| `/api/analytics` | GET | Campaign metrics |
-| `/api/analytics/export` | GET | Export CSV/Excel/PDF |
-
-## 📊 Google Sheets Schema
-
-### Contacts Tab
-```
-| Email | Phone | Name | Segment | Added |
-|-------|-------|------|---------|-------|
-| ... | +254... | ... | Students | 2026-06-18 |
-```
-
-### Analytics Tab
-```
-| CampaignID | Name | Date | Sent | Delivered | Failed | SuccessRate |
-|-----------|------|------|------|-----------|--------|-------------|
-| ... | Holiday Updates | 2026-06-18 | 1000 | 950 | 50 | 95% |
-```
-
-### SyncLog Tab
-```
-| Timestamp | Action | Status | RecordCount |
-|-----------|--------|--------|-------------|
-| 2026-06-18T10:30:00Z | SYNC | SUCCESS | 150 |
-```
-
-### Templates Tab
-```
-| ID | Name | Body | Variables | Created |
-|----|------|------|-----------|---------|
-| 1 | Welcome | "Hi {{name}}, welcome!" | ["{{name}}"] | 2026-06-18 |
-```
-
-## 🔐 Security Features
-
-- **Session-Based Auth**: NextAuth with secure session management
-- **Route Protection**: Middleware validates authentication on all dashboard routes
-- **Input Validation**: Zod schemas for all API requests
-- **Rate Limiting**: Implement via n8n rate limiting
-- **HTTPS**: Enforced via Cloudflare SSL
-- **Environment Secrets**: All credentials stored in `.env.local` (never in code)
-- **CORS**: Configured for n8n webhook endpoints only
-- **Audit Logging**: All actions logged via tslog
-
-## 📱 Deployment
-
-### Docker Deployment (Contabo VPS)
-
-```bash
-# Build image
-docker build -t hewane-dashboard .
-
-# Run container
-docker run -p 3000:3000 \
-  -e NEXTAUTH_SECRET=... \
-  -e GOOGLE_SHEETS_ID=... \
-  hewane-dashboard
-
-# Or use docker-compose
-docker-compose up -d
-```
-
-### Nginx Reverse Proxy Configuration
-```nginx
-server {
-    listen 443 ssl;
-    server_name dashboard.hewane.com;
-
-    ssl_certificate /etc/letsencrypt/live/hewane.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/hewane.com/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-### PM2 Process Management
-```bash
-pm2 start "pnpm start" --name "hewane-dashboard"
-pm2 save
-pm2 startup
-```
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed production setup.
-
-## 🧪 Testing
-
-### Running Tests
-```bash
-pnpm test                    # All tests
-pnpm test:watch             # Watch mode
-pnpm test:coverage          # Coverage report
-```
-
-### API Testing with Postman
-- Import the Postman collection: `/docs/postman-collection.json`
-- Configure environment variables for API endpoints
-- Test all 10 routes with sample data
-
-## 📖 n8n Workflow Integration
-
-### Workflow A: Contact Sync
-- **Trigger**: Dashboard `/api/sync` endpoint
-- **Steps**:
-  1. Receive contacts from Dashboard
-  2. Validate contact data
-  3. Upsert into Google Sheets (Contacts tab)
-  4. Update SyncLog with status
-  5. Return success/error response
-
-### Workflow B: Broadcast Campaign
-- **Trigger**: Dashboard `/api/broadcast/start` endpoint
-- **Steps**:
-  1. Fetch contacts from Google Sheets (filtered by segment)
-  2. Send WhatsApp messages via Twilio
-  3. Update Analytics tab with delivery status
-  4. Poll for delivery confirmations
-  5. Return progress via `/api/broadcast/status`
-
-**Webhook URLs**:
-```
-POST https://your-domain.com/api/broadcast/start
-POST https://your-domain.com/api/broadcast/pause
-POST https://your-domain.com/api/broadcast/stop
-```
-
-## 🐛 Troubleshooting
-
-**Login fails**: Check NEXTAUTH_SECRET is set and NEXTAUTH_URL matches domain
-
-**Google Sheets API errors**: Verify service account has Editor access to spreadsheet
-
-**n8n webhooks not firing**: Confirm N8N_WEBHOOK_URL is reachable and n8n service is running
-
-**Contacts not syncing**: Check Google Sheets schema matches expected columns
-
-See [SECURITY.md](./SECURITY.md) for security audit checklist.
-
-## 📝 License
-
-Internal use only for Hewane School of Music
-
-## 👥 Support
-
-For issues or feature requests: support@hewane.com
+In-app **Help & Guide** (`/help`) explains daily workflows for staff.
 
 ---
 
-**Built with Next.js 16 + React 19 + TypeScript**
-Last Updated: June 18, 2026
+## Google Sheets configuration
+
+Edit **`sheets.config.json`** at the project root (not `.env`).
+
+Supports **multiple contact sources**, each with its own spreadsheet, tab, and column mapping:
+
+- `schema: "hewane"` — recommended Hewane column layout  
+- `schema: "google-contacts"` — Google Contacts export headers  
+- `schema: "custom"` — manual `headers` / `columns` mapping  
+
+Optional tabs on the primary spreadsheet: **Templates**, **Analytics**, **SyncLog** (for writes and reporting).
+
+---
+
+## n8n workflows
+
+Workflow JSON files live next to this repo:
+
+```
+../workflows/
+  Hewane – Workflow A_ Whatsapp Broadcast message.json
+  Hewane – Workflow B_ Multi-Sheet Sync.json
+```
+
+### Naming note (important)
+
+n8n export **file names** (A/B) do **not** match dashboard **env var** names. Use webhook paths:
+
+| Dashboard env var | Webhook path | n8n file to import | Dashboard action |
+|-------------------|--------------|--------------------|------------------|
+| `N8N_WORKFLOW_A_URL` | `hewane-sheets-sync` | **Workflow B** — Multi-Sheet Sync | Contacts → Sync / Validate |
+| `N8N_WORKFLOW_B_URL` | `hewane-broadcast-trigger` | **Workflow A** — WhatsApp Broadcast | Broadcast → Start campaign |
+
+Example URLs:
+
+```env
+N8N_WORKFLOW_A_URL=https://<n8n-host>/webhook/hewane-sheets-sync
+N8N_WORKFLOW_B_URL=https://<n8n-host>/webhook/hewane-broadcast-trigger
+```
+
+### After importing workflows in n8n
+
+1. Assign **Google Sheets** credentials on sheet nodes  
+2. Assign **Meta / WhatsApp HTTP** credentials on send nodes  
+3. Set `WHATSAPP_PHONE_NUMBER_ID` in n8n environment  
+4. **Activate** both workflows  
+5. Share all spreadsheets with the Google service account  
+
+Development often uses a **Cloudflare tunnel** URL — update all three n8n env vars when the tunnel changes.
+
+---
+
+## App features
+
+| Area | Route | Notes |
+|------|-------|-------|
+| Overview | `/` | KPIs, sync health, quick actions |
+| Contacts | `/contacts` | Search, filters, pagination, sync, validate |
+| Templates | `/templates` | Create, copy, duplicate; use in broadcast |
+| Broadcast | `/broadcast` | Template or custom message; delivery speeds |
+| Analytics | `/analytics` | Campaign history; CSV / Excel / PDF export |
+| Settings | `/settings` | Preferences; connected sheets overview |
+| Help | `/help` | Staff guide and FAQ |
+
+---
+
+## Project layout
+
+```
+app/
+  (dashboard)/          # Protected pages (auth required)
+  api/                    # REST endpoints (stats, contacts, sync, broadcast, …)
+  sign-in/  sign-up/
+components/
+  dashboard/              # Sidebar, contacts workspace, help guide, …
+  ui/                     # Shared UI primitives
+lib/
+  sheets-config.ts        # Reads sheets.config.json
+  auth.ts                 # Better Auth server config
+public/
+  icon.svg                # Hewane logo (source for favicons)
+  manifest.webmanifest
+scripts/
+  db-setup.ts             # Admin seed
+  generate-icons.mjs      # Regenerate favicons from icon.svg
+sheets.config.json        # Multi-sheet Google config
+```
+
+---
+
+## Scripts
+
+```bash
+pnpm dev              # Development server (port 3000)
+pnpm build            # Generate icons + production build
+pnpm start            # Run production build
+pnpm icons:generate   # Regenerate favicons / og-image from icon.svg
+pnpm db:setup         # Create tables + seed admin user
+pnpm lint             # ESLint
+```
+
+---
+
+## Docker (optional)
+
+Local Postgres + dashboard:
+
+```bash
+# Set BETTER_AUTH_SECRET and Google/n8n vars in .env.local first
+docker compose up -d
+```
+
+The dashboard container mounts `sheets.config.json` read-only so sheet config can change without rebuilding.
+
+Production build uses Next.js **standalone** output. Ensure `sheets.config.json` is present at runtime (included in the image and volume-mounted in compose).
+
+---
+
+## Deployment checklist (colleague handoff)
+
+- [ ] `.env` / hosting secrets: `DATABASE_URL`, `BETTER_AUTH_*`, `NEXT_PUBLIC_SITE_URL`  
+- [ ] Google service account + `sheets.config.json` verified  
+- [ ] n8n workflows imported, credentials set, workflows **active**  
+- [ ] `N8N_WORKFLOW_A_URL` / `N8N_WORKFLOW_B_URL` point to live webhooks  
+- [ ] `pnpm build && pnpm start` (or Docker) succeeds  
+- [ ] Sign in, load Contacts, run Validate, test Broadcast in dry/n8n test mode  
+- [ ] Set `DISABLE_SIGNUP=true` in production  
+
+---
+
+## API overview
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/stats` | GET | Dashboard KPIs |
+| `/api/contacts` | GET | Paginated contacts |
+| `/api/contacts/validate` | POST | Validate sheets (→ n8n A) |
+| `/api/sync` | POST | Sync sheets (→ n8n A) |
+| `/api/templates` | GET, POST | Message templates |
+| `/api/broadcast/start` | POST | Start campaign (→ n8n B) |
+| `/api/broadcast/pause` | POST | Pause (needs `N8N_API_KEY`) |
+| `/api/broadcast/stop` | POST | Stop (needs `N8N_API_KEY`) |
+| `/api/analytics` | GET | Campaign metrics |
+| `/api/sheets/config` | GET | Connected sheet sources |
+
+All `/api/*` routes except `/api/auth/*` require a signed-in session.
+
+---
+
+## Tech stack
+
+- **Next.js 16** (App Router) + **React 19** + **TypeScript**
+- **Better Auth** + **PostgreSQL** (Neon in current setup)
+- **Google Sheets API** via service account
+- **n8n** for sync and WhatsApp delivery
+- **Tailwind CSS v4** + shadcn-style UI components
+- **Sonner** toasts, structured logging via **tslog**
+
+---
+
+## Known limitations (in progress)
+
+- Broadcast progress is driven by n8n responses; live polling is limited without `N8N_API_KEY`  
+- Templates / Analytics tabs may need to be created on the primary spreadsheet  
+- Some sheet schemas (Google Contacts export) are read-optimized; write-back may need Hewane-standard columns  
+- n8n tunnel URLs change each session during local dev  
+
+---
+
+## Support
+
+- In-app: **Help & Guide** at `/help`  
+- Email: support@hewane.com  
+
+Internal use — Hewane School of Music / Globcons Ltd.

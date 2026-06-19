@@ -10,6 +10,10 @@ export interface Contact {
   error?: string;
   sendWhatsapp: "Yes" | "No";
   sendEmail: "Yes" | "No";
+  /** Which spreadsheet this contact was loaded from */
+  sourceSpreadsheetId?: string;
+  sourceLabel?: string;
+  sourceTab?: string;
 }
 
 export interface Campaign {
@@ -79,4 +83,31 @@ export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
   warnings: string[];
+}
+
+export interface ContactsPagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface ContactsFacets {
+  segments: { value: string; count: number }[];
+  sources: { value: string; label: string; count: number }[];
+  statuses: { value: string; count: number }[];
+  whatsapp: { yes: number; no: number };
+}
+
+export interface PaginatedContactsResponse {
+  items: Contact[];
+  pagination: ContactsPagination;
+  facets: ContactsFacets;
+  meta: {
+    cachedAt: string;
+    fromCache: boolean;
+    queryMs?: number;
+  };
 }

@@ -26,6 +26,7 @@ RUN addgroup -g 1001 -S nodejs && \
 
 # Copy built application from builder
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/sheets.config.json ./sheets.config.json
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 

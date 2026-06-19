@@ -1,58 +1,40 @@
-import { Analytics } from '@vercel/analytics/next'
-import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
-import { Toaster } from 'sonner'
-import './globals.css'
+import { Analytics } from "@vercel/analytics/next";
+import type { Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
+import { createMetadata } from "@/lib/metadata";
+import { siteConfig } from "@/lib/site";
+import { JsonLd } from "@/components/json-ld";
+import "./globals.css";
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
-export const metadata: Metadata = {
-  title: 'Hewane Music - Dashboard',
-  description: 'WhatsApp Broadcast & Contact Management Dashboard',
-  generator: 'v0.app',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
-  },
-}
+export const metadata = createMetadata();
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
-}
+  colorScheme: "light",
+  themeColor: siteConfig.themeColor,
+  width: "device-width",
+  initialScale: 1,
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="font-sans antialiased">
+    <html lang={siteConfig.language}>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
+        <JsonLd />
         {children}
         <Toaster position="top-right" richColors />
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
-  )
+  );
 }

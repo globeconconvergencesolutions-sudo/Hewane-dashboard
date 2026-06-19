@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getServerSession } from "@/lib/auth-session";
+import { getPublicSheetsConfigForN8n } from "@/lib/sheets-config-n8n";
 import logger, { errorLogger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session) {
+    const session = await getServerSession(request.headers);
+    if (!session?.user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -23,11 +24,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Call n8n Workflow B with campaign details
+    const sheetsConfig = await getPublicSheetsConfigForN8n()
+
     const response = await fetch(n8nUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        action: "start",
+        action: 'start',
         campaignId: `campaign_${Date.now()}`,
         campaignName: body.campaignName,
         messageType: body.messageType,
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest) {
         deliverySpeed: body.deliverySpeed,
         emailFallback: body.emailFallback,
         timestamp: new Date().toISOString(),
+        sheetsConfig,
       }),
     });
 
