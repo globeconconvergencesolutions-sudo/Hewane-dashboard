@@ -7,19 +7,29 @@ import { Button } from "@/components/ui/button";
 import { PageHero } from "@/components/dashboard/page-hero";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { N8nIntegrationsCard } from "@/components/dashboard/n8n-integrations-card";
+import { ValidationSummaryCard } from "@/components/dashboard/validation-summary-card";
+import { ValidationStatusChip } from "@/components/dashboard/validation-status-chip";
+import { useIntegrationsStatus } from "@/hooks/use-integrations-status";
+import { useValidationReport } from "@/hooks/use-validation-report";
 import { DashboardStats } from "@/lib/types";
 import {
   ArrowRight,
   BarChart3,
   MessageSquare,
   Send,
+  ShieldCheck,
   TrendingUp,
+  Upload,
   Users,
 } from "lucide-react";
 
 export default function DashboardHome() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const validationReport = useValidationReport();
+  const { integrations, loading: integrationsLoading, refresh: refreshIntegrations } =
+    useIntegrationsStatus();
 
   useEffect(() => {
     async function fetchStats() {
@@ -45,13 +55,22 @@ export default function DashboardHome() {
         ? "text-amber-600"
         : "text-red-600";
 
+  const n8nReadyCount = integrations
+    ? [
+        integrations.n8n.validateConfigured && !integrations.n8n.validateDisabledReason,
+        integrations.n8n.syncConfigured && !integrations.n8n.syncDisabledReason,
+        integrations.n8n.broadcastConfigured && !integrations.n8n.broadcastDisabledReason,
+      ].filter(Boolean).length
+    : 0;
+
   return (
     <div className="space-y-6">
       <PageHero
         title="Dashboard Overview"
-        description="Monitor contacts, campaign health, and Google Sheets sync status at a glance."
+        description="Monitor contacts, validation health, sheet sync, and campaign readiness."
         actions={
           <>
+            <ValidationStatusChip report={validationReport} />
             <Button
               asChild
               variant="outline"
@@ -96,7 +115,7 @@ export default function DashboardHome() {
             <StatCard
               label="Sheets sync"
               value={<span className="capitalize">{stats?.syncHealth ?? "unknown"}</span>}
-              hint="Google Sheets health"
+              hint="Cache / sheet freshness"
               icon={<BarChart3 className="size-5" />}
               iconClassName="bg-secondary/20 text-secondary-foreground"
               valueClassName={syncColor}
@@ -109,27 +128,27 @@ export default function DashboardHome() {
         <Card className="border-border/80 shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle>Quick actions</CardTitle>
-            <CardDescription>Jump straight into the workflows you use most.</CardDescription>
+            <CardDescription>Recommended flow: refresh → validate → sync → broadcast.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             {[
               {
                 href: "/contacts",
-                title: "Manage contacts",
-                desc: "Search, filter, sync sheets",
-                icon: Users,
+                title: "Validate contacts",
+                desc: "Check phones & duplicates",
+                icon: ShieldCheck,
+              },
+              {
+                href: "/contacts",
+                title: "Sync sheets",
+                desc: "Run n8n sync workflow",
+                icon: Upload,
               },
               {
                 href: "/broadcast",
                 title: "Launch broadcast",
                 desc: "Send WhatsApp campaigns",
                 icon: Send,
-              },
-              {
-                href: "/templates",
-                title: "Message templates",
-                desc: "Create reusable messages",
-                icon: MessageSquare,
               },
               {
                 href: "/analytics",
@@ -139,7 +158,7 @@ export default function DashboardHome() {
               },
             ].map((action) => (
               <Link
-                key={action.href}
+                key={action.title}
                 href={action.href}
                 className="group flex items-start gap-4 rounded-xl border border-border/80 p-4 transition-all hover:border-primary/20 hover:bg-primary/[0.03]"
               >
@@ -156,29 +175,41 @@ export default function DashboardHome() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader>
-            <CardTitle>System status</CardTitle>
-            <CardDescription>Live operational snapshot</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
-              <span className="text-muted-foreground">Workflow</span>
-              <span className="font-medium capitalize">{stats?.workflowStatus ?? "unknown"}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
-              <span className="text-muted-foreground">Last sync</span>
-              <span className="font-medium">
-                {stats?.lastSync ? new Date(stats.lastSync).toLocaleString() : "Not yet synced"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
-              <span className="text-muted-foreground">Failed this month</span>
-              <span className="font-medium text-red-600">{stats?.failedThisMonth ?? 0}</span>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <ValidationSummaryCard report={validationReport} />
+
+          <Card className="border-border/80 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">System status</CardTitle>
+              <CardDescription>Live operational snapshot</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+                <span className="text-muted-foreground">n8n workflows</span>
+                <span className="font-medium">
+                  {integrationsLoading ? "…" : `${n8nReadyCount}/3 ready`}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+                <span className="text-muted-foreground">Last cache refresh</span>
+                <span className="font-medium">
+                  {stats?.lastSync ? new Date(stats.lastSync).toLocaleString() : "Not yet synced"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+                <span className="text-muted-foreground">Failed this month</span>
+                <span className="font-medium text-red-600">{stats?.failedThisMonth ?? 0}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      <N8nIntegrationsCard
+        integrations={integrations}
+        loading={integrationsLoading}
+        onRefresh={refreshIntegrations}
+      />
     </div>
   );
 }

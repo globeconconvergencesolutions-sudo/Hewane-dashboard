@@ -33,6 +33,7 @@ Edit `.env.local`:
 | `NEXT_PUBLIC_SITE_URL` | Yes | Same as above for SEO / Open Graph |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Yes | Service account client email |
 | `GOOGLE_SERVICE_ACCOUNT_KEY` | Yes | Private key (`\n` for newlines) |
+| `N8N_VALIDATE_WEBHOOK_URL` | For validate | Webhook `…/hewane-validate` |
 | `N8N_WORKFLOW_A_URL` | For sync | Webhook `…/hewane-sheets-sync` |
 | `N8N_WORKFLOW_B_URL` | For broadcast | Webhook `…/hewane-broadcast-trigger` |
 | `N8N_BASE_URL` | Optional | n8n host (pause/stop controls) |
@@ -88,24 +89,28 @@ Workflow JSON files live next to this repo:
 
 n8n export **file names** (A/B) do **not** match dashboard **env var** names. Use webhook paths:
 
-| Dashboard env var | Webhook path | n8n file to import | Dashboard action |
-|-------------------|--------------|--------------------|------------------|
-| `N8N_WORKFLOW_A_URL` | `hewane-sheets-sync` | **Workflow B** — Multi-Sheet Sync | Contacts → Sync / Validate |
-| `N8N_WORKFLOW_B_URL` | `hewane-broadcast-trigger` | **Workflow A** — WhatsApp Broadcast | Broadcast → Start campaign |
+| Dashboard env var | Webhook path | Dashboard action |
+|-------------------|--------------|------------------|
+| `N8N_VALIDATE_WEBHOOK_URL` | `hewane-validate` | Contacts → **Validate** |
+| `N8N_WORKFLOW_A_URL` | `hewane-sheets-sync` | Contacts → **Sync Sheets** |
+| `N8N_WORKFLOW_B_URL` | `hewane-broadcast-trigger` | Broadcast → **Start campaign** |
 
 Example URLs:
 
 ```env
+N8N_VALIDATE_WEBHOOK_URL=https://<n8n-host>/webhook/hewane-validate
 N8N_WORKFLOW_A_URL=https://<n8n-host>/webhook/hewane-sheets-sync
 N8N_WORKFLOW_B_URL=https://<n8n-host>/webhook/hewane-broadcast-trigger
 ```
+
+Legacy n8n export file names (A = broadcast, B = sync) differ from the `N8N_WORKFLOW_A/B` env var letters — use webhook paths above.
 
 ### After importing workflows in n8n
 
 1. Assign **Google Sheets** credentials on sheet nodes  
 2. Assign **Meta / WhatsApp HTTP** credentials on send nodes  
 3. Set `WHATSAPP_PHONE_NUMBER_ID` in n8n environment  
-4. **Activate** both workflows  
+4. **Activate** all three workflows (validate, sync, broadcast)  
 5. Share all spreadsheets with the Google service account  
 
 Development often uses a **Cloudflare tunnel** URL — update all three n8n env vars when the tunnel changes.
@@ -183,7 +188,7 @@ Production build uses Next.js **standalone** output. Ensure `sheets.config.json`
 - [ ] `.env` / hosting secrets: `DATABASE_URL`, `BETTER_AUTH_*`, `NEXT_PUBLIC_SITE_URL`  
 - [ ] Google service account + `sheets.config.json` verified  
 - [ ] n8n workflows imported, credentials set, workflows **active**  
-- [ ] `N8N_WORKFLOW_A_URL` / `N8N_WORKFLOW_B_URL` point to live webhooks  
+- [ ] `N8N_VALIDATE_WEBHOOK_URL`, `N8N_WORKFLOW_A_URL`, and `N8N_WORKFLOW_B_URL` point to live webhooks  
 - [ ] `pnpm build && pnpm start` (or Docker) succeeds  
 - [ ] Sign in, load Contacts, run Validate, test Broadcast in dry/n8n test mode  
 - [ ] Set `DISABLE_SIGNUP=true` in production  
@@ -196,7 +201,7 @@ Production build uses Next.js **standalone** output. Ensure `sheets.config.json`
 |-------|--------|---------|
 | `/api/stats` | GET | Dashboard KPIs |
 | `/api/contacts` | GET | Paginated contacts |
-| `/api/contacts/validate` | POST | Validate sheets (→ n8n A) |
+| `/api/contacts/validate` | POST | Validate sheets (→ hewane-validate) |
 | `/api/sync` | POST | Sync sheets (→ n8n A) |
 | `/api/templates` | GET, POST | Message templates |
 | `/api/broadcast/start` | POST | Start campaign (→ n8n B) |

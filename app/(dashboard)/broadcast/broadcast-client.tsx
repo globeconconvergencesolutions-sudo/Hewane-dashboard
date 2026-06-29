@@ -13,7 +13,13 @@ import { PageHero } from "@/components/dashboard/page-hero";
 import { SEGMENTS, DELIVERY_SPEEDS } from "@/lib/constants";
 import { MessageTemplate } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import type { IntegrationsStatus } from "@/lib/app-config";
+import {
+  ValidationGateBanner,
+  broadcastBlockedByValidation,
+} from "@/components/dashboard/validation-gate-banner";
+import { ValidationStatusChip } from "@/components/dashboard/validation-status-chip";
+import { useIntegrationsStatus } from "@/hooks/use-integrations-status";
+import { useValidationReport } from "@/hooks/use-validation-report";
 import {
   Send,
   Pause,
@@ -56,7 +62,9 @@ export default function BroadcastPage() {
 
   const [startLoading, setStartLoading] = useState(false);
   const [controlLoading, setControlLoading] = useState(false);
-  const [integrations, setIntegrations] = useState<IntegrationsStatus | null>(null);
+  const [acknowledgeValidationBypass, setAcknowledgeValidationBypass] = useState(false);
+  const validationReport = useValidationReport();
+  const { integrations } = useIntegrationsStatus();
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === templateId),
@@ -86,16 +94,11 @@ export default function BroadcastPage() {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  useEffect(() => {
-    fetch("/api/integrations/status")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) setIntegrations(data as IntegrationsStatus);
-      })
-      .catch(() => {});
-  }, []);
-
   const broadcastDisabledReason = integrations?.n8n.broadcastDisabledReason ?? null;
+  const validationBlocksStart = broadcastBlockedByValidation(
+    validationReport,
+    acknowledgeValidationBypass
+  );
 
   useEffect(() => {
     const fromUrl = searchParams.get("templateId");
@@ -117,6 +120,7 @@ export default function BroadcastPage() {
 
   const canStart =
     !broadcastDisabledReason &&
+    !validationBlocksStart &&
     campaignName.trim().length > 0 &&
     (messageType === "custom" ? messageBody.trim().length > 0 : Boolean(templateId));
 
@@ -145,6 +149,14 @@ export default function BroadcastPage() {
     if (!canStart) return;
     if (broadcastDisabledReason) {
       toast({ title: "Broadcast unavailable", description: broadcastDisabledReason, variant: "destructive" });
+      return;
+    }
+    if (validationBlocksStart) {
+      toast({
+        title: "Validation required",
+        description: "Fix validation issues on Contacts, or acknowledge the warning to proceed.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -264,14 +276,23 @@ export default function BroadcastPage() {
         title="Broadcast Campaign"
         description="Launch targeted WhatsApp messages to your contact groups with controlled delivery speed."
         actions={
-          <Button
-            asChild
-            variant="outline"
-            className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-          >
-            <Link href="/templates">Manage templates</Link>
-          </Button>
+          <>
+            <ValidationStatusChip report={validationReport} className="border-white/20 bg-white/10" />
+            <Button
+              asChild
+              variant="outline"
+              className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+            >
+              <Link href="/templates">Manage templates</Link>
+            </Button>
+          </>
         }
+      />
+
+      <ValidationGateBanner
+        report={validationReport}
+        acknowledgeBypass={acknowledgeValidationBypass}
+        onAcknowledgeBypass={setAcknowledgeValidationBypass}
       />
 
       {broadcastDisabledReason ? (
@@ -421,7 +442,11 @@ export default function BroadcastPage() {
                 <Button
                   onClick={handleStartBroadcast}
                   disabled={isRunning || startLoading || !canStart}
-                  title={broadcastDisabledReason ?? undefined}
+                  title={
+                    validationBlocksStart
+                      ? "Complete validation on Contacts first"
+                      : broadcastDisabledReason ?? undefined
+                  }
                   className="min-w-[160px] flex-1 bg-[#7D3F7E] hover:bg-[#6a356b]"
                 >
                   <Send className="mr-2 size-4" />

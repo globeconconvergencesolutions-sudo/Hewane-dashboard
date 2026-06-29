@@ -87,9 +87,9 @@ export async function GET(request: NextRequest) {
       logger.debug('[API] Sync log unavailable', error)
     }
 
-    const workflowStatus = getIntegrationsStatus(isSheetsConfigured()).n8n.syncConfigured
-      ? 'running'
-      : 'stopped'
+    const workflowStatus = getIntegrationsStatus(isSheetsConfigured()).n8n.broadcastConfigured
+      ? "running"
+      : "stopped";
 
     const stats: DashboardStats = {
       totalContacts,

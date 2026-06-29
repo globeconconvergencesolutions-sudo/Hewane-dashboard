@@ -25,10 +25,14 @@ const SYNC_LOG_COLUMN_KEYS = GOOGLE_SHEETS_COLUMNS[SHEET_TABS.SYNC_LOG]
 function getColumnIndex(
   key: string,
   defaults: string[],
-  overrides?: Partial<Record<string, number>>
+  overrides?: Partial<Record<string, number>>,
+  schema?: ReturnType<typeof resolveSchema>
 ) {
   if (overrides && key in overrides && overrides[key] !== undefined) {
     return overrides[key] as number
+  }
+  if (schema === 'google-contacts' || schema === 'custom') {
+    return -1
   }
   return defaults.indexOf(key)
 }
@@ -89,42 +93,38 @@ export function parseContactRow(
   rowNumber: number
 ): Contact | null {
   const columns = source.columns || {}
-  const rawName = cell(row, getColumnIndex('name', CONTACT_COLUMN_KEYS, columns))
-  const rawPhone = cell(row, getColumnIndex('phone', CONTACT_COLUMN_KEYS, columns))
+  const schema = resolveSchema(source)
+  const col = (field: string) =>
+    getColumnIndex(field, CONTACT_COLUMN_KEYS, columns, schema)
+
+  const rawName = cell(row, col('name'))
+  const rawPhone = cell(row, col('phone'))
 
   if (!rawName && !rawPhone) return null
 
   const phone = rawPhone ? formatKenyaPhone(rawPhone) : ''
   const name = rawName || (phone ? `Contact ${phone.slice(-4)}` : '')
-  const schema = resolveSchema(source)
-
-  const readOptional = (field: keyof typeof columns) =>
-    cell(row, getColumnIndex(field, CONTACT_COLUMN_KEYS, columns))
 
   const defaultSendWhatsapp = schema === 'hewane' ? 'No' : 'Yes'
   const defaultSendEmail = schema === 'hewane' ? 'No' : 'Yes'
 
-  const id =
-    cell(row, getColumnIndex('id', CONTACT_COLUMN_KEYS, columns)) ||
-    `${source.spreadsheetId}:${rowNumber}`
+  const id = cell(row, col('id')) || `${source.spreadsheetId}:${rowNumber}`
 
   return {
     id,
     name,
     phone,
-    email: cell(row, getColumnIndex('email', CONTACT_COLUMN_KEYS, columns)) || undefined,
-    segment: cell(row, getColumnIndex('segment', CONTACT_COLUMN_KEYS, columns)),
-    status: (cell(row, getColumnIndex('status', CONTACT_COLUMN_KEYS, columns)) ||
-      '') as Contact['status'],
+    email: cell(row, col('email')) || undefined,
+    segment: cell(row, col('segment')),
+    status: (cell(row, col('status')) || '') as Contact['status'],
     lastSent: (() => {
-      const value = cell(row, getColumnIndex('lastSent', CONTACT_COLUMN_KEYS, columns))
+      const value = cell(row, col('lastSent'))
       return value ? new Date(value) : undefined
     })(),
-    waMessageId:
-      cell(row, getColumnIndex('waMessageId', CONTACT_COLUMN_KEYS, columns)) || undefined,
-    error: cell(row, getColumnIndex('error', CONTACT_COLUMN_KEYS, columns)) || undefined,
-    sendWhatsapp: (readOptional('sendWhatsapp') || defaultSendWhatsapp) as Contact['sendWhatsapp'],
-    sendEmail: (readOptional('sendEmail') || defaultSendEmail) as Contact['sendEmail'],
+    waMessageId: cell(row, col('waMessageId')) || undefined,
+    error: cell(row, col('error')) || undefined,
+    sendWhatsapp: (cell(row, col('sendWhatsapp')) || defaultSendWhatsapp) as Contact['sendWhatsapp'],
+    sendEmail: (cell(row, col('sendEmail')) || defaultSendEmail) as Contact['sendEmail'],
     sourceSpreadsheetId: source.spreadsheetId,
     sourceLabel: source.label,
     sourceTab: source.tab,

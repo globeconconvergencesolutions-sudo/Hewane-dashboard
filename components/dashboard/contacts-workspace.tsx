@@ -38,7 +38,11 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Contact, PaginatedContactsResponse } from "@/lib/types";
 import type { ContactSortField } from "@/lib/contacts-query";
-import type { IntegrationsStatus } from "@/lib/app-config";
+import type { ContactValidationReport } from "@/lib/validation";
+import { clearValidationReport, saveValidationReport } from "@/lib/validation-storage";
+import { ValidationReportPanel } from "@/components/dashboard/validation-report-panel";
+import { useIntegrationsStatus } from "@/hooks/use-integrations-status";
+import { useValidationReport } from "@/hooks/use-validation-report";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
@@ -185,22 +189,16 @@ export function ContactsWorkspace() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [validateLoading, setValidateLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
-  const [integrations, setIntegrations] = useState<IntegrationsStatus | null>(null);
+  const validationReport = useValidationReport();
 
   const debouncedQ = useDebounce(query.q, 300);
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
-  useEffect(() => {
-    fetch("/api/integrations/status")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) setIntegrations(data as IntegrationsStatus);
-      })
-      .catch(() => {});
-  }, []);
+  const { integrations } = useIntegrationsStatus();
 
   const syncDisabledReason = integrations?.n8n.syncDisabledReason ?? null;
+  const validateDisabledReason = integrations?.n8n.validateDisabledReason ?? null;
 
   const fetchContacts = useCallback(
     async (nextQuery: QueryState, refresh = false, signal?: AbortSignal) => {
@@ -328,21 +326,31 @@ export function ContactsWorkspace() {
   };
 
   const handleValidate = async () => {
-    if (syncDisabledReason) {
-      toast({ title: "Validate unavailable", description: syncDisabledReason, variant: "destructive" });
+    if (validateDisabledReason) {
+      toast({
+        title: "Validate unavailable",
+        description: validateDisabledReason,
+        variant: "destructive",
+      });
       return;
     }
     setValidateLoading(true);
     try {
       const res = await fetch("/api/contacts/validate", { method: "POST" });
-      const body = await res.json();
-      if (!res.ok) throw new Error((body.error as string) || "Validation failed");
+      const body = (await res.json()) as ContactValidationReport & { error?: string };
+      if (!res.ok) throw new Error(body.error || "Validation failed");
+
+      saveValidationReport(body);
+
       if (body.valid) {
-        toast({ title: "Validation passed", description: "All contacts look good." });
+        toast({
+          title: "Validation passed",
+          description: body.overallHealth || "All contacts look good.",
+        });
       } else {
         toast({
           title: "Validation issues found",
-          description: `${body.errors?.length || 0} issue(s) detected.`,
+          description: `${body.summary.invalidContacts} invalid · ${body.summary.duplicates} duplicate(s). See report below.`,
           variant: "destructive",
         });
       }
@@ -415,8 +423,8 @@ export function ContactsWorkspace() {
               variant="outline"
               className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
               onClick={handleValidate}
-              disabled={validateLoading || Boolean(syncDisabledReason)}
-              title={syncDisabledReason ?? undefined}
+              disabled={validateLoading || Boolean(validateDisabledReason)}
+              title={validateDisabledReason ?? undefined}
             >
               <ShieldCheck className="mr-2 size-4" />
               {validateLoading ? "Validating..." : "Validate"}
@@ -434,13 +442,33 @@ export function ContactsWorkspace() {
         }
       />
 
-      {syncDisabledReason ? (
+      {(validateDisabledReason || syncDisabledReason) ? (
         <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20">
-          <CardContent className="p-4 text-sm text-amber-950 dark:text-amber-100">
-            Validate and Sync Sheets need n8n Workflow B. {syncDisabledReason} Refresh still loads contacts
-            directly from Google Sheets.
+          <CardContent className="space-y-2 p-4 text-sm text-amber-950 dark:text-amber-100">
+            {validateDisabledReason ? (
+              <p>
+                <strong>Validate</strong> needs <code className="text-xs">N8N_VALIDATE_WEBHOOK_URL</code>{" "}
+                (hewane-validate). {validateDisabledReason}
+              </p>
+            ) : null}
+            {syncDisabledReason ? (
+              <p>
+                <strong>Sync Sheets</strong> needs <code className="text-xs">N8N_WORKFLOW_A_URL</code>{" "}
+                (hewane-sheets-sync). {syncDisabledReason}
+              </p>
+            ) : null}
+            <p className="text-amber-900/80 dark:text-amber-200/80">
+              Refresh still loads contacts directly from Google Sheets.
+            </p>
           </CardContent>
         </Card>
+      ) : null}
+
+      {validationReport ? (
+        <ValidationReportPanel
+          report={validationReport}
+          onDismiss={() => clearValidationReport()}
+        />
       ) : null}
 
       {/* Stats */}

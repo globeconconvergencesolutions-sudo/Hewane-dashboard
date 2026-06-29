@@ -157,8 +157,9 @@ export const ADMIN_CHECKLIST: string[] = [
   "BETTER_AUTH_SECRET and BETTER_AUTH_URL set correctly",
   "Google service account shared on every spreadsheet",
   "sheets.config.json lists all contact sources with correct tab names",
-  "N8N_WORKFLOW_A_URL → hewane-sheets-sync (n8n file: Workflow B — Multi-Sheet Sync)",
-  "N8N_WORKFLOW_B_URL → hewane-broadcast-trigger (n8n file: Workflow A — WhatsApp Broadcast)",
+  "N8N_VALIDATE_WEBHOOK_URL → hewane-validate (Contacts → Validate)",
+  "N8N_WORKFLOW_A_URL → hewane-sheets-sync (Contacts → Sync Sheets)",
+  "N8N_WORKFLOW_B_URL → hewane-broadcast-trigger (Broadcast → Start)",
   "N8N_API_KEY set if you need pause/stop controls during broadcasts",
   "Templates, Analytics, and SyncLog tabs on primary spreadsheet (optional but recommended)",
 ];
@@ -219,8 +220,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "contacts",
     question: "What does Sync Sheets do?",
     answer: [
-      "Sync Sheets triggers n8n Workflow A (hewane-sheets-sync). It pulls the latest rows from all configured spreadsheets and refreshes the dashboard cache.",
-      "Use Sync after bulk edits in Google Sheets or when contacts look out of date. A successful sync updates the last sync time on the dashboard home.",
+      "Sync Sheets triggers the hewane-sheets-sync n8n workflow (N8N_WORKFLOW_A_URL). It runs your sync logic across all configured spreadsheets, then the dashboard refreshes its contact cache.",
+      "Use Sync after bulk edits in Google Sheets or when contacts look out of date. Sync is separate from Validate — each has its own n8n webhook.",
     ],
     keywords: ["sync", "google sheets", "workflow a", "refresh", "pull"],
     relatedLinks: [{ href: "/contacts", label: "Sync from Contacts" }],
@@ -230,11 +231,22 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "contacts",
     question: "What does Validate do?",
     answer: [
-      "Validate runs a read-only check across your configured sheets. It flags missing phones, invalid formats, and structural issues before you send a campaign.",
-      "Always validate before a major broadcast — it is much cheaper to fix rows in Sheets than to recover from failed sends.",
+      "Validate triggers the hewane-validate n8n workflow (N8N_VALIDATE_WEBHOOK_URL). It checks every configured contact source and returns a detailed report: invalid rows, duplicates, and per-sheet summaries.",
+      "The report appears on the Contacts page after validation. Fix issues in Google Sheets, then validate again before a major broadcast.",
     ],
     keywords: ["validate", "validation", "errors", "phone", "check"],
     relatedLinks: [{ href: "/contacts", label: "Validate from Contacts" }],
+  },
+  {
+    id: "validation-report",
+    category: "contacts",
+    question: "Where does the validation report appear?",
+    answer: [
+      "After Validate completes, a full report panel opens on the Contacts page with per-sheet invalid rows, duplicates, and summary counts.",
+      "The latest report is remembered in your browser session and shown on the home dashboard, Settings, and Broadcast pages so you know whether it is safe to send.",
+    ],
+    keywords: ["validation report", "invalid rows", "duplicates", "panel"],
+    relatedLinks: [{ href: "/contacts", label: "Contacts" }],
   },
   {
     id: "multiple-sheets",
@@ -363,9 +375,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Sync health reflects how recently contacts were synced and whether the last sync succeeded.",
     ],
     bullets: [
-      "Open Contacts and click Sync Sheets",
+      "Open Contacts and click Validate (hewane-validate webhook)",
+      "Open Contacts and click Sync Sheets (hewane-sheets-sync webhook)",
       "Verify Google service account has Editor access on every spreadsheet",
-      "Confirm N8N_WORKFLOW_A_URL is correct and n8n workflow is active",
+      "Confirm N8N_VALIDATE_WEBHOOK_URL and N8N_WORKFLOW_A_URL are set on the server",
       "Check tab names in sheets.config.json match your actual sheet tabs",
     ],
     keywords: ["sync health", "warning", "error", "failed"],
@@ -394,6 +407,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "When Start broadcast returns an error, work through these checks in order.",
     ],
     bullets: [
+      "Run Validate on Contacts and fix any invalid rows",
       "N8N_WORKFLOW_B_URL is set and the n8n workflow is published",
       "n8n has valid Meta/WhatsApp credentials and phone number ID",
       "Contacts exist for the selected group with valid E.164 phones",

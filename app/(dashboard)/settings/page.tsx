@@ -17,7 +17,11 @@ import {
   type DashboardSettings,
 } from "@/lib/dashboard-settings";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Sheet, Bell, Building2, Shield } from "lucide-react";
+import { LogOut, Sheet, Bell, Building2, Shield, Workflow } from "lucide-react";
+import { N8nIntegrationsCard } from "@/components/dashboard/n8n-integrations-card";
+import { ValidationSummaryCard } from "@/components/dashboard/validation-summary-card";
+import { useIntegrationsStatus } from "@/hooks/use-integrations-status";
+import { useValidationReport } from "@/hooks/use-validation-report";
 
 type SheetsConfigResponse = {
   config: {
@@ -39,6 +43,9 @@ export default function SettingsPage() {
   const [sheetsLoading, setSheetsLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const validationReport = useValidationReport();
+  const { integrations, loading: integrationsLoading, refresh: refreshIntegrations } =
+    useIntegrationsStatus();
 
   useEffect(() => {
     setSettings(loadDashboardSettings());
@@ -268,6 +275,30 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-4">
+          <N8nIntegrationsCard
+            integrations={integrations}
+            loading={integrationsLoading}
+            onRefresh={refreshIntegrations}
+            compact
+          />
+
+          <ValidationSummaryCard report={validationReport} />
+
+          <Card className="border-border/80 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Workflow className="size-4 text-primary" />
+                Workflow pipeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>1. Refresh contacts from Google Sheets</p>
+              <p>2. Validate via hewane-validate webhook</p>
+              <p>3. Sync via hewane-sheets-sync webhook</p>
+              <p>4. Broadcast via hewane-broadcast-trigger webhook</p>
+            </CardContent>
+          </Card>
+
           <Card className="border-border/80 shadow-sm">
             <CardHeader>
               <CardTitle>Dashboard info</CardTitle>
