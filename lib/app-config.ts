@@ -21,6 +21,23 @@ export function getN8nBroadcastWebhookUrl(): string | null {
   return url || null;
 }
 
+/** Meta WhatsApp Business API (template management) */
+export function getWhatsAppWabaId(): string | null {
+  return process.env.WHATSAPP_WABA_ID?.trim() || null;
+}
+
+export function getWhatsAppAccessToken(): string | null {
+  return process.env.WHATSAPP_ACCESS_TOKEN?.trim() || null;
+}
+
+export function getWhatsAppGraphVersion(): string {
+  return process.env.WHATSAPP_GRAPH_VERSION?.trim() || "v21.0";
+}
+
+export function isMetaWhatsAppConfigured(): boolean {
+  return Boolean(getWhatsAppWabaId() && getWhatsAppAccessToken());
+}
+
 export function isN8nSyncConfigured(): boolean {
   return Boolean(getN8nSyncWebhookUrl());
 }
@@ -37,6 +54,12 @@ export type IntegrationsStatus = {
   signUpDisabled: boolean;
   sheets: {
     configured: boolean;
+  };
+  meta: {
+    configured: boolean;
+    wabaIdConfigured: boolean;
+    accessTokenConfigured: boolean;
+    disabledReason: string | null;
   };
   n8n: {
     syncConfigured: boolean;
@@ -79,9 +102,28 @@ export function getIntegrationsStatus(sheetsConfigured: boolean): IntegrationsSt
     broadcastDisabledReason = "Google Sheets is not configured.";
   }
 
+  const wabaId = getWhatsAppWabaId();
+  const accessToken = getWhatsAppAccessToken();
+  const metaConfigured = Boolean(wabaId && accessToken);
+
+  let metaDisabledReason: string | null = null;
+  if (!wabaId && !accessToken) {
+    metaDisabledReason = "WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN are not configured.";
+  } else if (!wabaId) {
+    metaDisabledReason = "WHATSAPP_WABA_ID is not configured.";
+  } else if (!accessToken) {
+    metaDisabledReason = "WHATSAPP_ACCESS_TOKEN is not configured.";
+  }
+
   return {
     signUpDisabled: isSignUpDisabled(),
     sheets: { configured: sheetsConfigured },
+    meta: {
+      configured: metaConfigured,
+      wabaIdConfigured: Boolean(wabaId),
+      accessTokenConfigured: Boolean(accessToken),
+      disabledReason: metaDisabledReason,
+    },
     n8n: {
       syncConfigured: Boolean(syncUrl),
       validateConfigured: Boolean(validateUrl),

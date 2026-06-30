@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { PageHero } from "@/components/dashboard/page-hero";
 import { SEGMENTS, DELIVERY_SPEEDS } from "@/lib/constants";
-import { MessageTemplate } from "@/lib/types";
+import type { WhatsAppTemplateRecord } from "@/lib/whatsapp-template-types";
 import { useToast } from "@/hooks/use-toast";
 import {
   ValidationGateBanner,
@@ -29,6 +29,7 @@ import {
   Zap,
   CheckCircle2,
   AlertCircle,
+  ShieldCheck,
 } from "lucide-react";
 
 type CampaignStatus = "idle" | "running" | "completed" | "paused" | "stopped" | "error";
@@ -43,13 +44,11 @@ export default function BroadcastPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [templates, setTemplates] = useState<WhatsAppTemplateRecord[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
 
   const [campaignName, setCampaignName] = useState("");
-  const [messageType, setMessageType] = useState<"template" | "custom">("template");
   const [templateId, setTemplateId] = useState("");
-  const [messageBody, setMessageBody] = useState("");
   const [contactGroup, setContactGroup] = useState("all");
   const [deliverySpeed, setDeliverySpeed] = useState("Standard");
   const [emailFallback, setEmailFallback] = useState(false);
@@ -58,7 +57,9 @@ export default function BroadcastPage() {
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<BroadcastMetrics>({ sent: 0, delivered: 0, failed: 0 });
-  const [statusMessage, setStatusMessage] = useState("Configure your campaign and launch when ready.");
+  const [statusMessage, setStatusMessage] = useState(
+    "Choose an approved Meta template and launch when ready."
+  );
 
   const [startLoading, setStartLoading] = useState(false);
   const [controlLoading, setControlLoading] = useState(false);
@@ -74,15 +75,14 @@ export default function BroadcastPage() {
   const fetchTemplates = useCallback(async () => {
     try {
       setTemplatesLoading(true);
-      const res = await fetch("/api/templates");
+      const res = await fetch("/api/whatsapp/templates?status=approved");
       if (res.ok) {
-        const data: MessageTemplate[] = await res.json();
-        setTemplates(data);
+        setTemplates(await res.json());
       }
     } catch {
       toast({
-        title: "Could not load templates",
-        description: "You can still send a custom message.",
+        title: "Could not load approved templates",
+        description: "Submit and approve templates on the Templates page first.",
         variant: "destructive",
       });
     } finally {
@@ -105,24 +105,16 @@ export default function BroadcastPage() {
     if (fromUrl && templates.length > 0) {
       const match = templates.find((t) => t.id === fromUrl);
       if (match) {
-        setMessageType("template");
         setTemplateId(match.id);
-        setMessageBody(match.body);
       }
     }
   }, [searchParams, templates]);
-
-  useEffect(() => {
-    if (messageType === "template" && selectedTemplate) {
-      setMessageBody(selectedTemplate.body);
-    }
-  }, [messageType, selectedTemplate]);
 
   const canStart =
     !broadcastDisabledReason &&
     !validationBlocksStart &&
     campaignName.trim().length > 0 &&
-    (messageType === "custom" ? messageBody.trim().length > 0 : Boolean(templateId));
+    Boolean(templateId);
 
   const parseStartResponse = (result: Record<string, unknown>) => {
     const execId =
@@ -169,9 +161,7 @@ export default function BroadcastPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           campaignName: campaignName.trim(),
-          messageType,
-          templateId: messageType === "template" ? templateId : undefined,
-          messageBody: messageBody.trim(),
+          templateId,
           contactGroup,
           deliverySpeed,
           emailFallback,
@@ -274,7 +264,7 @@ export default function BroadcastPage() {
       <PageHero
         eyebrow="WhatsApp campaigns"
         title="Broadcast Campaign"
-        description="Launch targeted WhatsApp messages to your contact groups with controlled delivery speed."
+        description="Send Meta-approved marketing templates to your contact groups with controlled delivery speed."
         actions={
           <>
             <ValidationStatusChip report={validationReport} className="border-white/20 bg-white/10" />
@@ -298,7 +288,7 @@ export default function BroadcastPage() {
       {broadcastDisabledReason ? (
         <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20">
           <CardContent className="p-4 text-sm text-amber-950 dark:text-amber-100">
-            Broadcast needs n8n Workflow A. {broadcastDisabledReason}
+            Broadcast needs n8n. {broadcastDisabledReason}
           </CardContent>
         </Card>
       ) : null}
@@ -309,7 +299,7 @@ export default function BroadcastPage() {
             <CardHeader>
               <CardTitle>Campaign details</CardTitle>
               <CardDescription>
-                Name your campaign, choose a template or custom message, and select recipients.
+                Select a verified Meta template and choose who receives the campaign.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -324,63 +314,51 @@ export default function BroadcastPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Message type</label>
-                <div className="flex flex-wrap gap-2">
-                  {(["template", "custom"] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setMessageType(type)}
-                      disabled={isRunning}
-                      className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-                        messageType === type
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border bg-background text-muted-foreground hover:bg-muted/50"
-                      }`}
-                    >
-                      {type === "template" ? "Use template" : "Custom message"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {messageType === "template" ? (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Template</label>
-                  <Select
-                    value={templateId}
-                    onChange={(e) => setTemplateId(e.target.value)}
-                    disabled={isRunning || templatesLoading}
-                  >
-                    <option value="">
-                      {templatesLoading ? "Loading templates…" : "Select a template"}
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <ShieldCheck className="size-4 text-emerald-600" />
+                  Approved Meta template
+                </label>
+                <Select
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  disabled={isRunning || templatesLoading}
+                >
+                  <option value="">
+                    {templatesLoading ? "Loading templates…" : "Select an approved template"}
+                  </option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.displayName} ({t.metaTemplateName})
                     </option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </Select>
-                  {templates.length === 0 && !templatesLoading ? (
-                    <p className="text-xs text-muted-foreground">
-                      No templates yet.{" "}
-                      <Link href="/templates" className="font-medium text-primary hover:underline">
-                        Create one
-                      </Link>
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
+                  ))}
+                </Select>
+                {templates.length === 0 && !templatesLoading ? (
+                  <p className="text-xs text-muted-foreground">
+                    No approved templates yet.{" "}
+                    <Link href="/templates" className="font-medium text-primary hover:underline">
+                      Create and submit a template
+                    </Link>
+                    .
+                  </p>
+                ) : null}
+              </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Message preview</label>
                 <Textarea
                   className="min-h-32 font-mono text-sm"
-                  placeholder="Your message here… Use {{name}} or {{segment}} for personalization."
-                  value={messageBody}
-                  onChange={(e) => setMessageBody(e.target.value)}
-                  disabled={isRunning || (messageType === "template" && Boolean(templateId))}
+                  placeholder="Select a template to preview the Meta-approved message."
+                  value={selectedTemplate?.body ?? ""}
+                  readOnly
+                  disabled={isRunning}
                 />
+                {selectedTemplate ? (
+                  <p className="text-xs text-muted-foreground">
+                    Meta name:{" "}
+                    <code className="rounded bg-muted px-1">{selectedTemplate.metaTemplateName}</code> ·{" "}
+                    {selectedTemplate.category} · {selectedTemplate.language}
+                  </p>
+                ) : null}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">

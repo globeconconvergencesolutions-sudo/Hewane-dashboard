@@ -66,8 +66,18 @@ export const GOOGLE_SHEETS_COLUMNS = {
 };
 
 export const TEMPLATE_VARIABLES = [
-  { label: "{{name}}", description: "Contact name" },
-  { label: "{{segment}}", description: "Contact segment" },
-  { label: "{{1}}", description: "Custom variable 1" },
-  { label: "{{2}}", description: "Custom variable 2" },
+  { label: "{{1}}", description: "Variable 1 — usually contact name", defaultSource: "name" as const },
+  { label: "{{2}}", description: "Variable 2 — usually segment", defaultSource: "segment" as const },
+  { label: "{{3}}", description: "Variable 3 — custom text", defaultSource: "custom" as const },
+  { label: "{{4}}", description: "Variable 4 — custom text", defaultSource: "custom" as const },
 ];
+
+export const DEFAULT_WHATSAPP_TEMPLATE_LANGUAGE = "en_US";
+
+export const WHATSAPP_TEMPLATE_STATUSES = [
+  { id: "draft", label: "Drafts", description: "Not yet submitted to Meta" },
+  { id: "pending", label: "Pending", description: "Awaiting Meta review" },
+  { id: "approved", label: "Approved", description: "Verified — ready for broadcast" },
+  { id: "rejected", label: "Rejected", description: "Meta declined — duplicate and fix" },
+  { id: "paused", label: "Paused", description: "Disabled by Meta" },
+] as const;

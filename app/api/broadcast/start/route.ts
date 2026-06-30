@@ -3,6 +3,8 @@ import { getServerSession } from "@/lib/auth-session";
 import { getPublicSheetsConfigForN8n } from "@/lib/sheets-config-n8n";
 import { getIntegrationsStatus, getN8nBroadcastWebhookUrl } from "@/lib/app-config";
 import { isSheetsConfigured } from "@/lib/sheets-config";
+import { getApprovedWhatsAppTemplateForBroadcast } from "@/lib/whatsapp-templates";
+import { extractMetaVariables } from "@/lib/whatsapp-template-utils";
 import logger, { errorLogger } from "@/lib/logger";
 
 function n8nErrorMessage(error: unknown): string {
@@ -32,6 +34,23 @@ export async function POST(request: NextRequest) {
       campaignName: body.campaignName,
     });
 
+    if (!body.templateId) {
+      return NextResponse.json(
+        { error: "An approved Meta template is required for broadcast." },
+        { status: 400 }
+      );
+    }
+
+    let template;
+    try {
+      template = await getApprovedWhatsAppTemplateForBroadcast(body.templateId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid template";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    const templateVariables = extractMetaVariables(template.body);
+
     const n8nUrl = getN8nBroadcastWebhookUrl()!;
     const sheetsConfig = await getPublicSheetsConfigForN8n();
     if (!sheetsConfig) {
@@ -45,9 +64,13 @@ export async function POST(request: NextRequest) {
         action: "start",
         campaignId: `campaign_${Date.now()}`,
         campaignName: body.campaignName,
-        messageType: body.messageType,
-        templateId: body.templateId,
-        messageBody: body.messageBody,
+        messageType: "template",
+        templateId: template.id,
+        metaTemplateName: template.metaTemplateName,
+        templateLanguage: template.language,
+        templateVariables,
+        variableMapping: template.variableMapping,
+        messageBody: template.body,
         contactGroup: body.contactGroup,
         deliverySpeed: body.deliverySpeed,
         emailFallback: body.emailFallback,

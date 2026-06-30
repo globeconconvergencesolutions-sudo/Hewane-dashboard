@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, jsonb } from 'drizzle-orm/pg-core'
 
 // --- Better Auth required tables -------------------------------------------
 // Column names are camelCase to match Better Auth's defaults. Do not rename.
@@ -54,26 +54,25 @@ export const verification = pgTable('verification', {
 })
 
 // --- App tables ------------------------------------------------------------
-// Add your app tables below. Always include a plain `userId` column so queries
-// can be scoped per user — the security model depends on this column existing,
-// not on a foreign key. Do NOT add a foreign key constraint
-// (`.references(() => user.id, ...)`) unless the user explicitly asks for
-// foreign keys or referential integrity; FK constraints make iterating on the
-// schema harder.
-//
-// Example:
-//
-// import { serial } from "drizzle-orm/pg-core"
-//
-// export const todos = pgTable("todos", {
-//   id: serial("id").primaryKey(),
-//   userId: text("userId").notNull(),
-//   title: text("title").notNull(),
-//   completed: boolean("completed").notNull().default(false),
-//   createdAt: timestamp("createdAt").notNull().defaultNow(),
-// })
-//
-// If the user asks for foreign keys, add the reference back in:
-//   userId: text("userId")
-//     .notNull()
-//     .references(() => user.id, { onDelete: "cascade" }),
+
+import type { VariableMapping } from '@/lib/whatsapp-template-types'
+
+export const whatsappTemplates = pgTable('whatsapp_templates', {
+  id: text('id').primaryKey(),
+  userId: text('userId').notNull(),
+  displayName: text('displayName').notNull(),
+  metaTemplateName: text('metaTemplateName').notNull().unique(),
+  body: text('body').notNull(),
+  category: text('category').notNull().default('MARKETING'),
+  language: text('language').notNull().default('en_US'),
+  variableMapping: jsonb('variableMapping').$type<VariableMapping[]>().notNull().default([]),
+  exampleValues: jsonb('exampleValues').$type<string[]>().notNull().default([]),
+  status: text('status').notNull().default('draft'),
+  metaTemplateId: text('metaTemplateId'),
+  rejectionReason: text('rejectionReason'),
+  submittedAt: timestamp('submittedAt'),
+  approvedAt: timestamp('approvedAt'),
+  lastSyncedAt: timestamp('lastSyncedAt'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})

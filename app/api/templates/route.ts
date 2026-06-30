@@ -1,60 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from '@/lib/auth-session'
-import { appendTemplateRow, getAllTemplates } from '@/lib/sheet-data'
-import { MessageTemplate } from '@/lib/types'
-import logger, { errorLogger } from '@/lib/logger'
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "@/lib/auth-session";
+import { listWhatsAppTemplates } from "@/lib/whatsapp-templates";
+import { errorLogger } from "@/lib/logger";
 
+/** @deprecated Use GET /api/whatsapp/templates */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(request.headers)
+    const session = await getServerSession(request.headers);
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    logger.debug('[API] GET /api/templates called')
+    const templates = await listWhatsAppTemplates();
+    const legacy = templates.map((t) => ({
+      id: t.id,
+      name: t.displayName,
+      body: t.body,
+      variables: t.variableMapping.map((v) => v.meta),
+      createdAt: t.createdAt,
+      lastUsed: t.approvedAt ?? undefined,
+      status: t.status,
+      metaTemplateName: t.metaTemplateName,
+    }));
 
-    const templates = await getAllTemplates()
-
-    logger.info(`[API] Returned ${templates.length} templates`)
-    return NextResponse.json(templates)
+    return NextResponse.json(legacy);
   } catch (error) {
-    errorLogger('[API] GET /api/templates error', error)
-    return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 })
+    errorLogger("[API] GET /api/templates error", error);
+    return NextResponse.json({ error: "Failed to fetch templates" }, { status: 500 });
   }
 }
 
+/** @deprecated Use POST /api/whatsapp/templates */
 export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(request.headers)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    logger.debug('[API] POST /api/templates called', { name: body.name })
-
-    const templateId = `template_${Date.now()}`
-
-    const newTemplate: MessageTemplate = {
-      id: templateId,
-      name: body.name,
-      body: body.body,
-      variables: body.variables || [],
-      createdAt: new Date(),
-    }
-
-    await appendTemplateRow([
-      templateId,
-      body.name,
-      body.body,
-      JSON.stringify(body.variables || []),
-      new Date().toISOString(),
-    ])
-
-    logger.info('[API] Template created', newTemplate)
-    return NextResponse.json(newTemplate, { status: 201 })
-  } catch (error) {
-    errorLogger('[API] POST /api/templates error', error)
-    return NextResponse.json({ error: 'Failed to create template' }, { status: 500 })
-  }
+  return NextResponse.json(
+    { error: "Use POST /api/whatsapp/templates to create Meta message templates." },
+    { status: 410 }
+  );
 }

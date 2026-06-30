@@ -19,6 +19,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, Sheet, Bell, Building2, Shield, Workflow } from "lucide-react";
 import { N8nIntegrationsCard } from "@/components/dashboard/n8n-integrations-card";
+import { MetaWhatsAppIntegrationsCard } from "@/components/dashboard/meta-whatsapp-integrations-card";
 import { ValidationSummaryCard } from "@/components/dashboard/validation-summary-card";
 import { useIntegrationsStatus } from "@/hooks/use-integrations-status";
 import { useValidationReport } from "@/hooks/use-validation-report";
@@ -275,6 +276,13 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-4">
+          <MetaWhatsAppIntegrationsCard
+            integrations={integrations}
+            loading={integrationsLoading}
+            onRefresh={refreshIntegrations}
+            compact
+          />
+
           <N8nIntegrationsCard
             integrations={integrations}
             loading={integrationsLoading}
@@ -294,8 +302,8 @@ export default function SettingsPage() {
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>1. Refresh contacts from Google Sheets</p>
               <p>2. Validate via hewane-validate webhook</p>
-              <p>3. Sync via hewane-sheets-sync webhook</p>
-              <p>4. Broadcast via hewane-broadcast-trigger webhook</p>
+              <p>3. Create &amp; submit Meta templates (Templates page)</p>
+              <p>4. Broadcast approved templates via hewane-broadcast-trigger</p>
             </CardContent>
           </Card>
 

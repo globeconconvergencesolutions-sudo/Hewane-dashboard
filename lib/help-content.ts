@@ -101,9 +101,9 @@ export const QUICK_START_STEPS: QuickStartStep[] = [
   },
   {
     step: 4,
-    title: "Create or pick a template",
+    title: "Create and submit a Meta template",
     description:
-      "Build a reusable message with placeholders like {{name}}. Templates save to your primary spreadsheet Templates tab when configured.",
+      "Draft a marketing message on Templates, add example values, then submit to Meta for approval. Only approved templates can be used in broadcast.",
     href: "/templates",
     hrefLabel: "Manage templates",
   },
@@ -160,6 +160,7 @@ export const ADMIN_CHECKLIST: string[] = [
   "N8N_VALIDATE_WEBHOOK_URL → hewane-validate (Contacts → Validate)",
   "N8N_WORKFLOW_A_URL → hewane-sheets-sync (Contacts → Sync Sheets)",
   "N8N_WORKFLOW_B_URL → hewane-broadcast-trigger (Broadcast → Start)",
+  "WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN for Meta template submit/sync",
   "N8N_API_KEY set if you need pause/stop controls during broadcasts",
   "Templates, Analytics, and SyncLog tabs on primary spreadsheet (optional but recommended)",
 ];
@@ -269,12 +270,12 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "broadcast",
     question: "How do I send a WhatsApp broadcast?",
     answer: [
-      "Go to Broadcast, name your campaign, choose a template or custom message, select a contact group, and pick a delivery speed.",
-      "Careful mode sends slower (safer for large lists). Standard is the default balance. Fast is for urgent, smaller groups.",
+      "Go to Broadcast, name your campaign, choose an approved Meta template, select a contact group, and pick a delivery speed.",
+      "Only templates with Approved status (verified by Meta) appear in the dropdown. Draft or pending templates cannot be sent.",
     ],
     bullets: [
-      "Template mode sends templateId + message body to n8n",
-      "Custom mode sends your free-text message only",
+      "Careful mode sends slower (safer for large lists). Standard is the default balance. Fast is for urgent, smaller groups.",
+      "The dashboard sends metaTemplateName and variable mapping to n8n for delivery.",
       "Email fallback sends email when WhatsApp is unavailable (if configured in n8n)",
     ],
     keywords: ["send", "whatsapp", "campaign", "start", "broadcast"],
@@ -310,14 +311,27 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "templates",
     question: "What variables can I use in templates?",
     answer: [
-      "Templates support placeholders that n8n replaces per contact when sending.",
+      "Meta WhatsApp templates use numbered placeholders that the dashboard maps to contact fields when sending.",
     ],
     bullets: [
-      "{{name}} — contact name from the sheet",
-      "{{segment}} — contact segment (Students, Parents, etc.)",
-      "{{1}}, {{2}} — custom numbered placeholders",
+      "{{1}} — usually mapped to contact name",
+      "{{2}} — usually mapped to segment",
+      "{{3}}, {{4}} — custom static example values for Meta review",
+      "Example values are required when submitting to Meta",
     ],
-    keywords: ["variables", "placeholders", "personalization", "merge"],
+    keywords: ["variables", "placeholders", "personalization", "merge", "meta"],
+    relatedLinks: [{ href: "/templates", label: "Templates" }],
+  },
+  {
+    id: "template-meta-submit",
+    category: "templates",
+    question: "How do I submit a template to Meta?",
+    answer: [
+      "Create a draft on the Templates page, fill in the Meta template name, body, and example values, then click Submit to Meta.",
+      "The dashboard calls the Meta Graph API directly — no n8n workflow is required for submission.",
+      "Status changes from Draft → Pending → Approved (or Rejected). Refresh pending templates to check review progress.",
+    ],
+    keywords: ["meta", "submit", "approval", "verify", "review"],
     relatedLinks: [{ href: "/templates", label: "Templates" }],
   },
   {
@@ -325,10 +339,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "templates",
     question: "How do I use a template in a broadcast?",
     answer: [
-      "On the Templates page, click Use on any template card — it opens Broadcast with that template pre-selected.",
-      "Alternatively, open Broadcast, set message type to Use template, and pick from the dropdown.",
+      "Only Meta-approved templates can be used. On the Templates page, click Use in broadcast on an approved template card.",
+      "Alternatively, open Broadcast and pick from the Approved Meta template dropdown.",
     ],
-    keywords: ["use template", "broadcast", "link"],
+    keywords: ["use template", "broadcast", "link", "approved"],
     relatedLinks: [
       { href: "/templates", label: "Templates" },
       { href: "/broadcast", label: "Broadcast" },
@@ -420,12 +434,18 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "templates-empty",
     category: "troubleshooting",
-    question: "Templates page is empty or create fails",
+    question: "Templates page is empty or submit fails",
     answer: [
-      "Templates are stored in a Templates tab on your primary spreadsheet. If templates array in sheets.config.json is empty, the app falls back to primarySpreadsheetId.",
-      "Create a Templates tab with columns: id, name, body, variables, createdAt, lastUsed — or ask your administrator to add templates config.",
+      "Templates are stored in PostgreSQL and submitted to Meta via WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN.",
     ],
-    keywords: ["templates empty", "create failed", "sheet tab"],
+    bullets: [
+      "Run pnpm db:setup to create the whatsapp_templates table",
+      "Set WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN in .env.local",
+      "Meta template names must be lowercase with underscores only",
+      "Provide example values for every {{1}}, {{2}} placeholder before submitting",
+      "If Meta rejects a template, duplicate it, fix the copy, and submit under a new name",
+    ],
+    keywords: ["templates empty", "create failed", "meta", "submit"],
     relatedLinks: [{ href: "/templates", label: "Templates" }],
   },
   {

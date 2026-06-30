@@ -38,6 +38,8 @@ Edit `.env.local`:
 | `N8N_WORKFLOW_B_URL` | For broadcast | Webhook `…/hewane-broadcast-trigger` |
 | `N8N_BASE_URL` | Optional | n8n host (pause/stop controls) |
 | `N8N_API_KEY` | Optional | n8n API key for pause/stop |
+| `WHATSAPP_WABA_ID` | For template submit | WhatsApp Business Account ID |
+| `WHATSAPP_ACCESS_TOKEN` | For template submit | Meta token with `whatsapp_business_management` |
 
 Share **every spreadsheet** in `sheets.config.json` with the service account as **Editor**.
 
@@ -123,8 +125,8 @@ Development often uses a **Cloudflare tunnel** URL — update all three n8n env 
 |------|-------|-------|
 | Overview | `/` | KPIs, sync health, quick actions |
 | Contacts | `/contacts` | Search, filters, pagination, sync, validate |
-| Templates | `/templates` | Create, copy, duplicate; use in broadcast |
-| Broadcast | `/broadcast` | Template or custom message; delivery speeds |
+| Templates | `/templates` | Draft, submit to Meta, use approved in broadcast |
+| Broadcast | `/broadcast` | Approved Meta templates only; delivery speeds |
 | Analytics | `/analytics` | Campaign history; CSV / Excel / PDF export |
 | Settings | `/settings` | Preferences; connected sheets overview |
 | Help | `/help` | Staff guide and FAQ |
@@ -203,7 +205,12 @@ Production build uses Next.js **standalone** output. Ensure `sheets.config.json`
 | `/api/contacts` | GET | Paginated contacts |
 | `/api/contacts/validate` | POST | Validate sheets (→ hewane-validate) |
 | `/api/sync` | POST | Sync sheets (→ n8n A) |
-| `/api/templates` | GET, POST | Message templates |
+| `/api/templates` | GET | Legacy list (use `/api/whatsapp/templates`) |
+| `/api/whatsapp/templates` | GET, POST | List/create Meta template drafts |
+| `/api/whatsapp/templates/[id]` | GET, PATCH | Get/update draft |
+| `/api/whatsapp/templates/[id]/submit` | POST | Submit draft to Meta |
+| `/api/whatsapp/templates/[id]/sync` | POST | Refresh status from Meta |
+| `/api/whatsapp/templates/[id]/duplicate` | POST | Duplicate template |
 | `/api/broadcast/start` | POST | Start campaign (→ n8n B) |
 | `/api/broadcast/pause` | POST | Pause (needs `N8N_API_KEY`) |
 | `/api/broadcast/stop` | POST | Stop (needs `N8N_API_KEY`) |
@@ -228,7 +235,7 @@ All `/api/*` routes except `/api/auth/*` require a signed-in session.
 ## Known limitations (in progress)
 
 - Broadcast progress is driven by n8n responses; live polling is limited without `N8N_API_KEY`  
-- Templates / Analytics tabs may need to be created on the primary spreadsheet  
+- Templates stored in PostgreSQL; Meta submit requires WHATSAPP_WABA_ID + WHATSAPP_ACCESS_TOKEN  
 - Some sheet schemas (Google Contacts export) are read-optimized; write-back may need Hewane-standard columns  
 - n8n tunnel URLs change each session during local dev  
 
