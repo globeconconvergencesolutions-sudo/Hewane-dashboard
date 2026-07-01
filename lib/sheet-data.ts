@@ -157,31 +157,36 @@ export async function getAllCampaigns(): Promise<Campaign[]> {
   const batches = await fetchAllSourceRows('analytics', { silent: true })
   const campaigns: Campaign[] = []
 
-  for (const { rows } of batches) {
-    rows.slice(1).forEach((row) => {
+  for (const { source, rows } of batches) {
+    rows.slice(1).forEach((row, index) => {
+      const rowNumber = index + 2
+      const campaignName = cell(row, getColumnIndex('campaignName', ANALYTICS_COLUMN_KEYS))
+      const dateRaw = cell(row, getColumnIndex('date', ANALYTICS_COLUMN_KEYS))
+      const idRaw = cell(row, getColumnIndex('id', ANALYTICS_COLUMN_KEYS))
+      const totalSent =
+        parseInt(cell(row, getColumnIndex('totalSent', ANALYTICS_COLUMN_KEYS)), 10) || 0
+
+      if (!campaignName && !idRaw && !dateRaw && totalSent === 0) return
+
       campaigns.push({
-        id: cell(row, getColumnIndex('id', ANALYTICS_COLUMN_KEYS)),
-        date: (() => {
-          const value = cell(row, getColumnIndex('date', ANALYTICS_COLUMN_KEYS))
-          return value ? new Date(value) : new Date()
-        })(),
+        id: idRaw || `${source.spreadsheetId}:${rowNumber}`,
+        date: dateRaw ? new Date(dateRaw) : new Date(0),
         time: cell(row, getColumnIndex('time', ANALYTICS_COLUMN_KEYS)),
-        campaignName: cell(row, getColumnIndex('campaignName', ANALYTICS_COLUMN_KEYS)),
-        messageType: cell(row, getColumnIndex('messageType', ANALYTICS_COLUMN_KEYS)) as
-          | 'template'
-          | 'custom',
-        totalSent: parseInt(cell(row, getColumnIndex('totalSent', ANALYTICS_COLUMN_KEYS)), 10) || 0,
+        campaignName: campaignName || `Campaign ${rowNumber}`,
+        messageType: (cell(row, getColumnIndex('messageType', ANALYTICS_COLUMN_KEYS)) ||
+          'custom') as Campaign['messageType'],
+        totalSent,
         delivered: parseInt(cell(row, getColumnIndex('delivered', ANALYTICS_COLUMN_KEYS)), 10) || 0,
         failed: parseInt(cell(row, getColumnIndex('failed', ANALYTICS_COLUMN_KEYS)), 10) || 0,
         emailFallback:
           parseInt(cell(row, getColumnIndex('emailFallback', ANALYTICS_COLUMN_KEYS)), 10) || 0,
         successRate: cell(row, getColumnIndex('successRate', ANALYTICS_COLUMN_KEYS)) || '0%',
-        contactGroup: cell(row, getColumnIndex('contactGroup', ANALYTICS_COLUMN_KEYS)),
+        contactGroup: cell(row, getColumnIndex('contactGroup', ANALYTICS_COLUMN_KEYS)) || 'All',
       })
     })
   }
 
-  return campaigns
+  return campaigns.sort((a, b) => b.date.getTime() - a.date.getTime())
 }
 
 export async function getAllTemplates(): Promise<MessageTemplate[]> {
@@ -259,7 +264,7 @@ export async function getLatestSyncLog(): Promise<SyncLog | null> {
 }
 
 export async function getAnalyticsExportRows(): Promise<Row[]> {
-  const batches = await fetchAllSourceRows('analytics')
+  const batches = await fetchAllSourceRows('analytics', { silent: true })
   const combined: Row[] = []
 
   for (const { rows } of batches) {

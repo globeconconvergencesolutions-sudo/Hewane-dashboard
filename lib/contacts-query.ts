@@ -21,6 +21,7 @@ export type ContactsQueryParams = {
 
 const DEFAULT_PAGE_SIZE = 25
 const MAX_PAGE_SIZE = 100
+export const EXPORT_MAX_ROWS = 50_000
 
 function normalizeStatus(status: Contact['status']) {
   return status || 'Pending'
@@ -195,4 +196,15 @@ export function queryContacts(
       fromCache: false,
     },
   }
+}
+
+export function queryContactsForExport(
+  contacts: Contact[],
+  params: Omit<ContactsQueryParams, 'page' | 'pageSize'>
+) {
+  return queryContacts(contacts, {
+    ...params,
+    page: 1,
+    pageSize: EXPORT_MAX_ROWS,
+  }).items
 }

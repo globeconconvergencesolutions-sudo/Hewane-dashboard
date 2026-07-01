@@ -21,8 +21,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select } from "@/components/ui/select";
 import { PageHero } from "@/components/dashboard/page-hero";
+import { ExportActions } from "@/components/dashboard/export-actions";
+import { MetaWhatsAppStatusBanner } from "@/components/dashboard/meta-whatsapp-status-banner";
 import { useToast } from "@/hooks/use-toast";
+import { useExportDownload } from "@/hooks/use-export-download";
 import { useIntegrationsStatus } from "@/hooks/use-integrations-status";
+import type { ExportFormat } from "@/lib/export-formats";
 import {
   Plus,
   Copy,
@@ -30,9 +34,7 @@ import {
   Sparkles,
   X,
   RefreshCw,
-  ShieldCheck,
   Clock,
-  AlertTriangle,
   CheckCircle2,
   FileEdit,
 } from "lucide-react";
@@ -96,7 +98,8 @@ function buildFormFromBody(body: string, displayName = ""): Pick<FormState, "bod
 export function WhatsAppTemplatesWorkspace() {
   const { toast } = useToast();
   const { integrations } = useIntegrationsStatus();
-  const metaConfigured = integrations?.meta.configured ?? false;
+  const meta = integrations?.meta;
+  const canSubmitToMeta = meta?.canSubmitTemplates ?? false;
 
   const [templates, setTemplates] = useState<WhatsAppTemplateRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +110,7 @@ export function WhatsAppTemplatesWorkspace() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormState>(EMPTY_FORM);
   const [manualMetaName, setManualMetaName] = useState(false);
+  const { downloadExport, exporting } = useExportDownload();
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -141,6 +145,16 @@ export function WhatsAppTemplatesWorkspace() {
     }
     return counts;
   }, [templates]);
+
+  const handleExport = (format: ExportFormat) => {
+    const params = new URLSearchParams();
+    params.set("format", format);
+    if (activeTab !== "all") params.set("status", activeTab);
+    downloadExport(format, {
+      url: `/api/whatsapp/templates/export?${params.toString()}`,
+      filenameBase: "hewane-whatsapp-templates",
+    });
+  };
 
   const openCreateForm = () => {
     setEditingId(null);
@@ -332,42 +346,25 @@ export function WhatsAppTemplatesWorkspace() {
         title="Message Templates"
         description="Draft marketing templates, submit them to Meta for approval, then use verified templates in broadcast campaigns."
         actions={
-          <Button
-            onClick={openCreateForm}
-            className="bg-[#E8B825] text-[#1a1a2e] hover:bg-[#f0c84a]"
-          >
-            <Plus className="mr-2 size-4" />
-            New draft
-          </Button>
+          <>
+            <ExportActions
+              variant="hero"
+              onExport={handleExport}
+              exporting={exporting}
+              disabled={loading || templates.length === 0}
+            />
+            <Button
+              onClick={openCreateForm}
+              className="bg-[#E8B825] text-[#1a1a2e] hover:bg-[#f0c84a]"
+            >
+              <Plus className="mr-2 size-4" />
+              New draft
+            </Button>
+          </>
         }
       />
 
-      {!metaConfigured ? (
-        <Card className="border-amber-200 bg-amber-50/80 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20">
-          <CardContent className="flex items-start gap-3 p-4 text-sm text-amber-950 dark:text-amber-100">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <div>
-              <p className="font-medium">Meta WhatsApp not connected</p>
-              <p className="mt-1 text-amber-900/90 dark:text-amber-200/90">
-                You can save drafts, but submitting for review requires{" "}
-                <code className="rounded bg-black/5 px-1">WHATSAPP_WABA_ID</code> and{" "}
-                <code className="rounded bg-black/5 px-1">WHATSAPP_ACCESS_TOKEN</code> on the server.{" "}
-                <Link href="/settings" className="font-medium underline">
-                  Check Settings
-                </Link>
-                .
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="border-emerald-200/80 bg-emerald-50/50 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
-          <CardContent className="flex items-center gap-3 p-4 text-sm text-emerald-900 dark:text-emerald-100">
-            <ShieldCheck className="size-4 shrink-0" />
-            Meta WhatsApp is connected — drafts can be submitted for review directly from this page.
-          </CardContent>
-        </Card>
-      )}
+      {meta ? <MetaWhatsAppStatusBanner meta={meta} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -571,7 +568,7 @@ export function WhatsAppTemplatesWorkspace() {
                       <Button
                         size="sm"
                         onClick={() => handleSubmitToMeta(template.id)}
-                        disabled={!metaConfigured || actionId === template.id}
+                        disabled={!canSubmitToMeta || actionId === template.id}
                       >
                         Submit to Meta
                       </Button>
@@ -587,7 +584,7 @@ export function WhatsAppTemplatesWorkspace() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleSync(template.id)}
-                      disabled={!metaConfigured || actionId === template.id}
+                      disabled={!canSubmitToMeta || actionId === template.id}
                     >
                       <RefreshCw className="mr-1.5 size-3.5" />
                       Refresh status

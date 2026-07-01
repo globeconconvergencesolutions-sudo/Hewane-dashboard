@@ -33,11 +33,14 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHero } from "@/components/dashboard/page-hero";
+import { ExportActions } from "@/components/dashboard/export-actions";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useExportDownload } from "@/hooks/use-export-download";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Contact, PaginatedContactsResponse } from "@/lib/types";
 import type { ContactSortField } from "@/lib/contacts-query";
+import type { ExportFormat } from "@/lib/export-formats";
 import type { ContactValidationReport } from "@/lib/validation";
 import { clearValidationReport, saveValidationReport } from "@/lib/validation-storage";
 import { ValidationReportPanel } from "@/components/dashboard/validation-report-panel";
@@ -100,6 +103,13 @@ function buildSearchParams(query: QueryState, refresh = false) {
   if (query.status !== "all") params.set("status", query.status);
   if (query.whatsapp !== "all") params.set("whatsapp", query.whatsapp);
   if (refresh) params.set("refresh", "true");
+  return params;
+}
+
+function buildExportSearchParams(query: QueryState, search: string) {
+  const params = buildSearchParams({ ...query, q: search });
+  params.delete("page");
+  params.delete("pageSize");
   return params;
 }
 
@@ -190,6 +200,7 @@ export function ContactsWorkspace() {
   const [validateLoading, setValidateLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const validationReport = useValidationReport();
+  const { downloadExport, exporting } = useExportDownload();
 
   const debouncedQ = useDebounce(query.q, 300);
   const toastRef = useRef(toast);
@@ -395,6 +406,15 @@ export function ContactsWorkspace() {
     }));
   };
 
+  const handleExport = (format: ExportFormat) => {
+    const params = buildExportSearchParams(query, debouncedQ);
+    params.set("format", format);
+    downloadExport(format, {
+      url: `/api/contacts/export?${params.toString()}`,
+      filenameBase: "hewane-contacts",
+    });
+  };
+
   if (initialLoading && !data) {
     return <ContactsSkeleton />;
   }
@@ -438,6 +458,12 @@ export function ContactsWorkspace() {
               <Upload className="mr-2 size-4" />
               {syncLoading ? "Syncing..." : "Sync Sheets"}
             </Button>
+            <ExportActions
+              variant="hero"
+              onExport={handleExport}
+              exporting={exporting}
+              disabled={isFetching}
+            />
           </>
         }
       />

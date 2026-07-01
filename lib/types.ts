@@ -111,3 +111,32 @@ export interface PaginatedContactsResponse {
     queryMs?: number;
   };
 }
+
+export interface AnalyticsSummary {
+  totalSent: number;
+  totalDelivered: number;
+  totalFailed: number;
+  totalEmailFallback: number;
+  avgSuccess: string;
+  campaignCount: number;
+}
+
+export interface AnalyticsFacets {
+  messageTypes: { value: string; count: number }[];
+  contactGroups: { value: string; count: number }[];
+}
+
+export interface PaginatedAnalyticsResponse {
+  items: Campaign[];
+  pagination: ContactsPagination;
+  /** Totals across all campaigns (unfiltered). */
+  summary: AnalyticsSummary;
+  /** Totals for the current filter set (before pagination). */
+  filteredSummary: AnalyticsSummary;
+  facets: AnalyticsFacets;
+  meta: {
+    cachedAt: string;
+    fromCache: boolean;
+    queryMs?: number;
+  };
+}

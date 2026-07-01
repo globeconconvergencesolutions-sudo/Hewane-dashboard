@@ -13,6 +13,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ExportActions } from "@/components/dashboard/export-actions";
+import { useExportDownload } from "@/hooks/use-export-download";
+import type { ExportFormat } from "@/lib/export-formats";
 import {
   Table,
   TableBody,
@@ -194,6 +197,7 @@ export function ValidationReportPanel({
 }) {
   const tone = healthTone(report.overallHealth, report.valid);
   const styles = toneClasses(tone);
+  const { downloadExport, exporting } = useExportDownload();
 
   const copySummary = async () => {
     const lines = [
@@ -209,6 +213,15 @@ export function ValidationReportPanel({
       ]),
     ];
     await navigator.clipboard.writeText(lines.join("\n"));
+  };
+
+  const handleExport = (format: ExportFormat) => {
+    downloadExport(format, {
+      url: `/api/validation/export?format=${format}`,
+      method: "POST",
+      body: report,
+      filenameBase: "hewane-validation-report",
+    });
   };
 
   return (
@@ -229,14 +242,17 @@ export function ValidationReportPanel({
             source(s) checked
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={copySummary}>
-            <Copy className="mr-1.5 size-3.5" />
-            Copy
-          </Button>
-          <Button type="button" variant="ghost" size="icon" onClick={onDismiss} title="Dismiss">
-            <X className="size-4" />
-          </Button>
+        <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+          <ExportActions onExport={handleExport} exporting={exporting} />
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={copySummary}>
+              <Copy className="mr-1.5 size-3.5" />
+              Copy
+            </Button>
+            <Button type="button" variant="ghost" size="icon" onClick={onDismiss} title="Dismiss">
+              <X className="size-4" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
 

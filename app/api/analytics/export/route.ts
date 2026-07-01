@@ -1,9 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from '@/lib/auth-session'
-import { getAnalyticsExportRows } from '@/lib/sheet-data'
+import { getCachedCampaigns } from '@/lib/analytics-cache'
+import {
+  parseAnalyticsQueryParams,
+  queryCampaignsForExport,
+} from '@/lib/analytics-query'
+import {
+  buildExportResponse,
+  exportErrorResponse,
+  parseExportFormat,
+} from '@/lib/export-formats'
+import { buildAnalyticsExportTable } from '@/lib/export-rows'
 import logger, { errorLogger } from '@/lib/logger'
-import Papa from 'papaparse'
-import * as XLSX from 'xlsx'
+
+const ANALYTICS_HEADERS = [
+  'id',
+  'date',
+  'time',
+  'campaignName',
+  'messageType',
+  'totalSent',
+  'delivered',
+  'failed',
+  'emailFallback',
+  'successRate',
+  'contactGroup',
+]
+
+function campaignsToRows(
+  items: Awaited<ReturnType<typeof queryCampaignsForExport>>
+): string[][] {
+  return items.map((campaign) => [
+    campaign.id,
+    campaign.date instanceof Date
+      ? campaign.date.toISOString().slice(0, 10)
+      : String(campaign.date).slice(0, 10),
+    campaign.time,
+    campaign.campaignName,
+    campaign.messageType,
+    String(campaign.totalSent),
+    String(campaign.delivered),
+    String(campaign.failed),
+    String(campaign.emailFallback),
+    campaign.successRate,
+    campaign.contactGroup,
+  ])
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,60 +54,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const format = request.nextUrl.searchParams.get('format') || 'csv'
-    logger.debug('[API] GET /api/analytics/export called', { format })
-
-    const analyticsData = await getAnalyticsExportRows()
-
-    if (format === 'csv') {
-      const csv = Papa.unparse(analyticsData)
-      return new NextResponse(csv, {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/csv',
-          'Content-Disposition': `attachment; filename="campaigns-${Date.now()}.csv"`,
-        },
-      })
+    const searchParams = request.nextUrl.searchParams
+    const format = parseExportFormat(searchParams.get('format'))
+    if (!format) {
+      return NextResponse.json(
+        { error: 'Invalid format. Use csv, excel, pdf, or sheets.' },
+        { status: 400 }
+      )
     }
 
-    if (format === 'excel') {
-      const worksheet = XLSX.utils.aoa_to_sheet(analyticsData)
-      const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Campaigns')
+    const { refresh, ...queryParams } = parseAnalyticsQueryParams(searchParams)
+    const { campaigns } = await getCachedCampaigns(refresh)
+    const items = queryCampaignsForExport(campaigns, queryParams)
 
-      const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' })
+    logger.debug('[API] GET /api/analytics/export called', {
+      format,
+      rows: items.length,
+    })
 
-      return new NextResponse(buffer, {
-        status: 200,
-        headers: {
-          'Content-Type':
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename="campaigns-${Date.now()}.xlsx"`,
-        },
-      })
-    }
-
-    if (format === 'pdf') {
-      const headers = analyticsData[0] || []
-      const rows = analyticsData.slice(1) || []
-
-      let pdfContent = 'CAMPAIGN ANALYTICS REPORT\n'
-      pdfContent += `Generated: ${new Date().toLocaleString()}\n\n`
-      pdfContent += headers.join('\t') + '\n'
-      pdfContent += rows.map((row: string[]) => row.join('\t')).join('\n')
-
-      return new NextResponse(pdfContent, {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/plain',
-          'Content-Disposition': `attachment; filename="campaigns-${Date.now()}.txt"`,
-        },
-      })
-    }
-
-    return NextResponse.json({ error: 'Invalid format' }, { status: 400 })
+    const table = buildAnalyticsExportTable(ANALYTICS_HEADERS, campaignsToRows(items))
+    return await buildExportResponse(table, format)
   } catch (error) {
     errorLogger('[API] GET /api/analytics/export error', error)
-    return NextResponse.json({ error: 'Export failed' }, { status: 500 })
+    return exportErrorResponse(error, 'analytics')
   }
 }

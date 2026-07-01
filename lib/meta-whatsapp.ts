@@ -3,6 +3,7 @@ import {
   getWhatsAppAccessToken,
   getWhatsAppGraphVersion,
   getWhatsAppWabaId,
+  getMetaWhatsAppDisabledMessage,
   isMetaWhatsAppConfigured,
 } from "@/lib/app-config";
 import type { WhatsAppTemplateCategory } from "@/lib/whatsapp-template-types";
@@ -48,7 +49,8 @@ function authHeaders(): HeadersInit {
 export function assertMetaWhatsAppConfigured(): void {
   if (!isMetaWhatsAppConfigured()) {
     throw new Error(
-      "Meta WhatsApp is not configured. Set WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN on the server."
+      getMetaWhatsAppDisabledMessage() ??
+        "Meta WhatsApp is not configured. Set WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN on the server."
     );
   }
 }

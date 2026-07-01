@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth-session";
-import { isMetaWhatsAppConfigured } from "@/lib/app-config";
+import { getMetaWhatsAppDisabledMessage, isMetaWhatsAppConfigured } from "@/lib/app-config";
 import { syncWhatsAppTemplateStatus } from "@/lib/whatsapp-templates";
 import { errorLogger } from "@/lib/logger";
 
@@ -17,6 +17,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json(
         {
           error:
+            getMetaWhatsAppDisabledMessage() ??
             "Meta WhatsApp is not configured. Set WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN on the server.",
         },
         { status: 503 }

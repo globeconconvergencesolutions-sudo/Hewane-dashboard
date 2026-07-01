@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth-session";
-import { getIntegrationsStatus } from "@/lib/app-config";
+import { getIntegrationsStatusWithVerification } from "@/lib/app-config";
 import { isSheetsConfigured } from "@/lib/sheets-config";
 
 export async function GET() {
@@ -9,5 +9,5 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(getIntegrationsStatus(isSheetsConfigured()));
+  return NextResponse.json(await getIntegrationsStatusWithVerification(isSheetsConfigured()));
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from '@/lib/auth-session'
-import { getAllCampaigns } from '@/lib/sheet-data'
+import { getCachedCampaigns, invalidateAnalyticsCache } from '@/lib/analytics-cache'
+import { parseAnalyticsQueryParams, queryCampaigns } from '@/lib/analytics-query'
 import logger, { errorLogger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
@@ -10,12 +11,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    logger.debug('[API] GET /api/analytics called')
+    const searchParams = request.nextUrl.searchParams
+    const { refresh, ...queryParams } = parseAnalyticsQueryParams(searchParams)
 
-    const campaigns = await getAllCampaigns()
+    if (refresh) {
+      invalidateAnalyticsCache()
+    }
 
-    logger.info(`[API] Returned ${campaigns.length} campaigns`)
-    return NextResponse.json(campaigns)
+    const started = Date.now()
+    const { campaigns, fromCache, cachedAt } = await getCachedCampaigns(refresh)
+    const result = queryCampaigns(campaigns, queryParams)
+
+    result.meta = {
+      cachedAt: cachedAt.toISOString(),
+      fromCache,
+      queryMs: Date.now() - started,
+    }
+
+    logger.debug('[API] GET /api/analytics', {
+      total: result.pagination.total,
+      page: result.pagination.page,
+      fromCache,
+    })
+
+    return NextResponse.json(result)
   } catch (error) {
     errorLogger('[API] GET /api/analytics error', error)
     return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 })

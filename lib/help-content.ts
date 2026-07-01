@@ -160,7 +160,7 @@ export const ADMIN_CHECKLIST: string[] = [
   "N8N_VALIDATE_WEBHOOK_URL → hewane-validate (Contacts → Validate)",
   "N8N_WORKFLOW_A_URL → hewane-sheets-sync (Contacts → Sync Sheets)",
   "N8N_WORKFLOW_B_URL → hewane-broadcast-trigger (Broadcast → Start)",
-  "WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN for Meta template submit/sync",
+  "WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN for Meta template submit/sync (must pass Settings → Test connection)",
   "N8N_API_KEY set if you need pause/stop controls during broadcasts",
   "Templates, Analytics, and SyncLog tabs on primary spreadsheet (optional but recommended)",
 ];
@@ -364,7 +364,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "analytics",
     question: "How do I export campaign reports?",
     answer: [
-      "On the Analytics page, use CSV, Excel, or PDF export buttons. Files download to your browser with campaign history from the sheet.",
+      "Use the export buttons on Contacts, Analytics, Templates, and the validation report panel.",
+      "Formats: CSV, Excel (.xlsx), PDF, and Google Sheets (UTF-8 CSV you can import via File → Import in Google Sheets).",
+      "Contact and analytics exports respect your current search filters.",
     ],
     keywords: ["export", "csv", "excel", "pdf", "download"],
     relatedLinks: [{ href: "/analytics", label: "Export from Analytics" }],
@@ -436,11 +438,12 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "troubleshooting",
     question: "Templates page is empty or submit fails",
     answer: [
-      "Templates are stored in PostgreSQL and submitted to Meta via WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN.",
+      "Templates are stored in PostgreSQL and submitted to Meta via WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN after a successful connection test in Settings.",
     ],
     bullets: [
       "Run pnpm db:setup to create the whatsapp_templates table",
-      "Set WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN in .env.local",
+      "Set real WHATSAPP_WABA_ID and WHATSAPP_ACCESS_TOKEN in .env.local (not the .env.example placeholders)",
+      "Open Settings → Meta WhatsApp templates → Test connection before submitting drafts",
       "Meta template names must be lowercase with underscores only",
       "Provide example values for every {{1}}, {{2}} placeholder before submitting",
       "If Meta rejects a template, duplicate it, fix the copy, and submit under a new name",

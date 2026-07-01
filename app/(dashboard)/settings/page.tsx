@@ -45,8 +45,24 @@ export default function SettingsPage() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const validationReport = useValidationReport();
-  const { integrations, loading: integrationsLoading, refresh: refreshIntegrations } =
+  const { integrations, loading: integrationsLoading, refresh: refreshIntegrations, verifyMetaConnection, verifyingMeta } =
     useIntegrationsStatus();
+
+  const handleVerifyMeta = useCallback(async () => {
+    try {
+      const message = await verifyMetaConnection();
+      toast({
+        title: "Meta WhatsApp connected",
+        description: message,
+      });
+    } catch (error) {
+      toast({
+        title: "Meta connection test failed",
+        description: error instanceof Error ? error.message : "Could not verify Meta WhatsApp.",
+        variant: "destructive",
+      });
+    }
+  }, [toast, verifyMetaConnection]);
 
   useEffect(() => {
     setSettings(loadDashboardSettings());
@@ -279,7 +295,9 @@ export default function SettingsPage() {
           <MetaWhatsAppIntegrationsCard
             integrations={integrations}
             loading={integrationsLoading}
+            verifying={verifyingMeta}
             onRefresh={refreshIntegrations}
+            onVerify={handleVerifyMeta}
             compact
           />
 
