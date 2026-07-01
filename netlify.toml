@@ -1,0 +1,12 @@
+# Netlify deployment for Next.js App Router (API routes, auth, middleware).
+# Do not set a static "publish directory" in the Netlify UI — this plugin handles routing.
+
+[build]
+  command = "corepack enable && pnpm install && pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
